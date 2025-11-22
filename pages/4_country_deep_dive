@@ -1,0 +1,98 @@
+import streamlit as st
+import plotly.express as px
+from utils.loader import load_base_data, load_pm25_data
+from utils.ui import header
+
+st.set_page_config(layout="wide")
+
+base_df = load_base_data()
+pm25_df = load_pm25_data()
+
+header(
+    "🔍 Country Deep Dive",
+    "Examine current pollutant profile and historical PM2.5 trends."
+)
+
+if pm25_df is None:
+    st.error("PM2.5 dataset missing. Upload pm25-air-pollution.csv in data/raw/")
+    st.stop()
+
+# Column inference
+pm_country = "country"
+pm_year = "year"
+pm_value = [c for c in pm25_df.columns if c not in [pm_country, pm_year]][0]
+
+# Find shared countries
+base_countries = set(base_df["country"].dropna())
+pm_countries = set(pm25_df[pm_country].dropna())
+common = sorted(list(base_countries & pm_countries))
+
+selected_country = st.selectbox(
+    "Choose a country:",
+    common
+)
+
+# ---------------- Section Layout ----------------
+left, right = st.columns(2)
+
+# ----- Current AQI -----
+with left:
+    st.markdown("### Current AQI Profile")
+
+    df_c = base_df[base_df["country"] == selected_country]
+
+    if df_c.empty:
+        st.info("No AQI data found.")
+    else:
+        if "aqi_value" in df_c.columns:
+            st.metric("Current Average AQI", f"{df_c['aqi_value'].mean():.1f}")
+
+        pollutant_cols = [
+            c for c in df_c.columns if c.endswith("_aqi_value") and c != "aqi_value"
+        ]
+
+        if pollutant_cols:
+            poll = df_c[pollutant_cols].mean().reset_index()
+            poll.columns = ["pollutant", "aqi"]
+            poll["pollutant"] = poll["pollutant"].str.replace("_aqi_value", "").str.upper()
+
+            fig_poll = px.bar(
+                poll,
+                x="pollutant",
+                y="aqi",
+                title="Pollutant Breakdown",
+                color="pollutant",
+                color_discrete_sequence=px.colors.qualitative.Set2
+            )
+            fig_poll.update_layout(showlegend=False, height=350)
+            st.plotly_chart(fig_poll, use_container_width=True)
+
+# ----- PM2.5 Trend -----
+with right:
+    st.markdown("### PM2.5 Historical Trend")
+
+    df_pm = pm25_df[pm25_df[pm_country] == selected_country].sort_values(pm_year)
+
+    if df_pm.empty:
+        st.info("PM2.5 data not available.")
+    else:
+        latest = df_pm.iloc[-1]
+        st.metric(
+            "Latest PM2.5 (µg/m³)",
+            f"{latest[pm_value]:.1f}",
+            f"In {int(latest[pm_year])}"
+        )
+
+        fig_line = px.line(
+            df_pm,
+            x=pm_year,
+            y=pm_value,
+            markers=True,
+            title="PM2.5 Exposure Over Time",
+            color_discrete_sequence=["#2563eb"]
+        )
+        fig_line.update_layout(height=350)
+        st.plotly_chart(fig_line, use_container_width=True)
+
+        with st.expander("Show data table"):
+            st.dataframe(df_pm[[pm_country, pm_year, pm_value]])
