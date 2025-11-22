@@ -1,0 +1,98 @@
+import streamlit as st
+import numpy as np
+import plotly.express as px
+from utils.loader import load_base_data
+from utils.preprocess import clean_missing, scale_column, percentile_filter
+from utils.ui import header
+
+st.set_page_config(layout="wide")
+
+header(
+    "🧪 Data Lab – Custom Analysis",
+    "Clean, transform, and explore AQI data interactively."
+)
+
+df = load_base_data()
+
+# --------------------------------------------------------
+# 1. Cleaning Options
+# --------------------------------------------------------
+st.markdown("## 1. Data Cleaning Settings")
+
+missing_option = st.radio(
+    "Missing values handling:",
+    ["None", "Drop", "Mean", "Median"]
+)
+
+mapping = {
+    "None": "none",
+    "Drop": "drop",
+    "Mean": "mean",
+    "Median": "median"
+}
+df_clean = clean_missing(df.copy(), mapping[missing_option])
+
+# Scaling
+numeric_cols = df_clean.select_dtypes(include="number").columns.tolist()
+target_col = st.selectbox("Select metric:", numeric_cols)
+
+scale_option = st.selectbox(
+    "Scaling method:",
+    ["None", "Min-max", "Z-score"]
+)
+
+scaling_map = {
+    "None": "none",
+    "Min-max": "minmax",
+    "Z-score": "zscore"
+}
+
+df_clean, active_col = scale_column(df_clean, target_col, scaling_map[scale_option])
+
+# Percentile filter
+low, high = st.slider(
+    "Percentile filter range:",
+    0, 100, (0, 100)
+)
+
+df_clean = percentile_filter(df_clean, target_col, low, high)
+
+# --------------------------------------------------------
+# 2. Question / Exploration
+# --------------------------------------------------------
+st.markdown("## 2. Ask a Question")
+
+analysis_type = st.radio(
+    "What would you like to analyse?",
+    [
+        "Record count",
+        "Average metric",
+        "Top N countries",
+        "Compare mean across countries"
+    ]
+)
+
+if analysis_type == "Record count":
+    st.metric("Rows after cleaning", len(df_clean))
+
+elif analysis_type == "Average metric":
+    st.metric("Average", f"{df_clean[active_col].mean():.2f}")
+
+elif analysis_type == "Top N countries":
+    if "country" not in df_clean.columns:
+        st.error("Country column missing.")
+    else:
+        n = st.slider("Select N:", 3, 20, 10)
+        agg = df_clean.groupby("country")[active_col].mean().nlargest(n).reset_index()
+        fig = px.bar(agg, x="country", y=active_col, title="Top Countries")
+        st.plotly_chart(fig, use_container_width=True)
+        st.dataframe(agg)
+
+else:
+    agg = df_clean.groupby("country")[active_col].mean().reset_index()
+    fig = px.bar(agg, x="country", y=active_col, title="Mean by Country")
+    st.plotly_chart(fig, use_container_width=True)
+    st.dataframe(agg)
+
+with st.expander("View cleaned dataset"):
+    st.dataframe(df_clean)
