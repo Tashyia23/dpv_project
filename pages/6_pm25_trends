@@ -1,0 +1,61 @@
+import streamlit as st
+import plotly.express as px
+from utils.loader import load_pm25_data
+from utils.ui import header
+
+st.set_page_config(layout="wide")
+
+pm25_df = load_pm25_data()
+
+header(
+    "📈 PM2.5 Trends (2010–2019)",
+    "Compare historical exposure across countries."
+)
+
+if pm25_df is None:
+    st.error("PM2.5 dataset missing.")
+    st.stop()
+
+pm_country = "country"
+pm_year = "year"
+pm_value = [c for c in pm25_df.columns if c not in [pm_country, pm_year]][0]
+
+countries = sorted(pm25_df[pm_country].dropna().unique())
+default = countries[:3]
+
+selected = st.multiselect(
+    "Choose countries to compare:",
+    countries,
+    default=default
+)
+
+if not selected:
+    st.info("Select at least one country.")
+    st.stop()
+
+df_c = pm25_df[pm25_df[pm_country].isin(selected)].sort_values(pm_year)
+
+fig = px.line(
+    df_c,
+    x=pm_year,
+    y=pm_value,
+    color=pm_country,
+    markers=True,
+    labels={"y": "PM2.5 (µg/m³)"},
+    title="PM2.5 Exposure Trends",
+    color_discrete_sequence=px.colors.qualitative.Set2
+)
+
+fig.update_layout(height=450)
+st.plotly_chart(fig, use_container_width=True)
+
+# Latest values
+latest = (
+    df_c.sort_values(pm_year)
+        .groupby(pm_country)
+        .tail(1)
+        .sort_values(pm_value, ascending=False)
+)
+
+st.markdown("### Latest Available PM2.5 Readings")
+st.dataframe(latest[[pm_country, pm_year, pm_value]])
