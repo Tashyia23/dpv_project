@@ -1,0 +1,71 @@
+import streamlit as st
+import plotly.express as px
+from utils.loader import load_base_data
+from utils.ui import header
+
+st.set_page_config(layout="wide")
+
+base_df = load_base_data()
+
+header(
+    "🏙 Country Pollutant Breakdown",
+    "Compare pollutant-specific AQI averages across selected countries."
+)
+
+if "country" not in base_df.columns:
+    st.error("Dataset does not contain a 'country' column.")
+    st.stop()
+
+# ------------------ Country selection ------------------
+countries = sorted(base_df["country"].dropna().unique().tolist())
+default_selection = countries[:3] if len(countries) >= 3 else countries
+
+selected_countries = st.multiselect(
+    "Select countries:",
+    countries,
+    default=default_selection
+)
+
+if not selected_countries:
+    st.info("Select at least one country to compare.")
+    st.stop()
+
+df_c = base_df[base_df["country"].isin(selected_countries)]
+
+# ------------------ Pollutant columns ------------------
+pollutant_cols = [
+    c for c in base_df.columns if c.endswith("_aqi_value") and c != "aqi_value"
+]
+
+if not pollutant_cols:
+    st.warning("No pollutant-specific AQI columns found.")
+    st.stop()
+
+# ------------------ Aggregate ------------------
+avg_pollutants = df_c.groupby("country")[pollutant_cols].mean().reset_index()
+
+long_df = avg_pollutants.melt(
+    id_vars="country",
+    var_name="pollutant",
+    value_name="aqi_value",
+)
+
+long_df["pollutant"] = long_df["pollutant"].str.replace("_aqi_value", "").str.upper()
+
+# ------------------ Plot ------------------
+fig = px.bar(
+    long_df,
+    x="country",
+    y="aqi_value",
+    color="pollutant",
+    barmode="group",
+    color_discrete_sequence=px.colors.qualitative.Set2,
+    labels={"aqi_value": "Average AQI"},
+    title="Average Pollutant Levels by Country",
+)
+
+fig.update_layout(height=500)
+st.plotly_chart(fig, use_container_width=True)
+
+with st.expander("Show underlying values"):
+    st.dataframe(long_df)
