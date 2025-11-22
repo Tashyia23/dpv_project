@@ -1,7 +1,6 @@
 import streamlit as st
 from utils.loader import load_base_data, load_pm25_data
 from utils.ui import header
-from styles.custom_css_loader import load_css   # optional
 
 st.set_page_config(
     page_title="Global Air Pollution Dashboard",
@@ -9,8 +8,10 @@ st.set_page_config(
     layout="wide",
 )
 
-load_css()
-
+def load_css():
+    with open("styles/custom.css") as f:
+        st.markdown(f"<style>{f.read()}</style>", unsafe_allow_html=True)
+        
 # header
 header(
     "🌍 Global Air Pollution Analytics Suite",
