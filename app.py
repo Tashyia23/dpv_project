@@ -11,12 +11,14 @@ st.set_page_config(
 
 load_css()
 
+# header
 header(
     "🌍 Global Air Pollution Analytics Suite",
-    "Use the sidebar to navigate between visualisation modules."
+    "Analyse global AQI levels, pollutant distributions, and long-term PM2.5 trends using scientific visualisation techniques."
 )
 
-st.write("### Welcome!")
+# welcome display
+st.write("### Welcome to the Global Air Pollution Dashboard!")
 st.write("""
 This dashboard provides:
 - Global AQI mapping  
