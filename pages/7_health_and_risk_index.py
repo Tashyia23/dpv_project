@@ -190,17 +190,19 @@ best_vals = [float(best_row[c]) for c in selected_pollutants]
 c1, c2, c3 = st.columns(3)
 
 # ---------------- Global Card ----------------
-global_html = f"""
-<div class="kpi-card" style="height:100%; padding-bottom:8px;">
-    <div class="kpi-label">Global Average Risk</div>
-    <div class="kpi-value">{avg_risk:.2f}</div>
-    <div class="kpi-sub">Scaled index (0–1)</div>
-</div>
-"""
-c1.markdown(global_html, unsafe_allow_html=True)
+c1.markdown(
+    f"""
+    <div class="kpi-card" style="height:100%;">
+        <div class="kpi-label">Global Average Risk</div>
+        <div class="kpi-value">{avg_risk:.2f}</div>
+        <div class="kpi-sub">Scaled index (0–1)</div>
+    </div>
+    """,
+    unsafe_allow_html=True
+)
 
 
-# ---------------- Worst Country Card (Merged HTML) ----------------
+# ---------------- Highest Risk Card - FULLY WRAPPED ----------------
 worst_html = f"""
 <div class="kpi-card">
     <div class="kpi-label">Highest Risk Country</div>
@@ -209,15 +211,16 @@ worst_html = f"""
 
     <div class="kpi-sub" style="margin-top:8px;">Pollutant Breakdown</div>
 
-    <div style="margin-top:14px;">
+    <div style="margin-top:12px;">
         {mini_bar_chart(worst_vals, labels)}
     </div>
 </div>
 """
+
 c2.markdown(worst_html, unsafe_allow_html=True)
 
 
-# ---------------- Best Country Card (Merged HTML) ----------------
+# ---------------- Lowest Risk Card - FULLY WRAPPED ----------------
 best_html = f"""
 <div class="kpi-card">
     <div class="kpi-label">Lowest Risk Country</div>
@@ -226,11 +229,12 @@ best_html = f"""
 
     <div class="kpi-sub" style="margin-top:8px;">Pollutant Breakdown</div>
 
-    <div style="margin-top:14px;">
+    <div style="margin-top:12px;">
         {mini_bar_chart(best_vals, labels)}
     </div>
 </div>
 """
+
 c3.markdown(best_html, unsafe_allow_html=True)
 
 st.markdown("</div>", unsafe_allow_html=True)
