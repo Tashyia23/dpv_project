@@ -50,7 +50,7 @@ st.set_page_config(layout="wide")
 # ---------------------------------------------------------
 # 1. Load unified global dataset
 # ---------------------------------------------------------
-df = load_master_dataset()
+df = load_merged_dataset()
 
 header(
     "🗺 Global Air Pollution Map",
