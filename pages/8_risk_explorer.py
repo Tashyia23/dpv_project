@@ -201,109 +201,106 @@
 
 #     st.plotly_chart(fig4, use_container_width=True)
 
+#_____________________________________________
+
 import streamlit as st
 import pandas as pd
 import numpy as np
 import plotly.express as px
 import plotly.graph_objects as go
 
-from utils.loader import load_base_data   # ✅ Use base dataset only
+from utils.data_loader import (
+    load_raw_dataset,
+    load_processed_dataset
+)
 from utils.ui import header
 from utils.regions import assign_region
 
 st.set_page_config(layout="wide")
 
-# -------------------------------------------------------------
-# LOAD DATA
-# -------------------------------------------------------------
-df = load_base_data()
+# ----------------------------------------------------------------
+# LOAD BOTH RAW + PROCESSED DATASETS
+# ----------------------------------------------------------------
+raw_g, raw_pm25 = load_raw_dataset()
+processed_df = load_processed_dataset()
 
-if df is None or df.empty:
-    st.error("❌ Base dataset could not be loaded.")
+if raw_g is None or processed_df is None:
+    st.error("❌ Failed to load raw or processed dataset.")
     st.stop()
-
-if "country" not in df.columns:
-    st.error("❌ Dataset does not contain required column: 'country'")
-    st.stop()
-
-# Ensure region coverage
-df["region"] = df["country"].apply(assign_region)
 
 header(
     "📊 Risk Explorer (Advanced Analytics)",
-    "Deep-dive into country risk, pollutant behaviour, regions, and cross-country comparison."
+    "Compare raw AQI data (before cleaning) vs processed risk index (after normalization)."
 )
 
-# -------------------------------------------------------------
-# IDENTIFY POLLUTANTS
-# -------------------------------------------------------------
-pollutants = [c for c in df.columns if c.endswith("_aqi_value")]
+# Identify pollutant columns
+raw_pollutants = [c for c in raw_g.columns if "AQI" in c or "Value" in c]
+proc_pollutants = [c for c in processed_df.columns if c.endswith("_aqi_value")]
 
-if not pollutants:
-    st.error("No pollutant columns ending with '_aqi_value' found.")
-    st.stop()
+# Add region
+raw_g["region"] = raw_g["Country"].apply(assign_region)
+processed_df["region"] = processed_df["country"].apply(assign_region)
 
-# -------------------------------------------------------------
-# BEFORE vs AFTER PROCESSING TOGGLE
-# -------------------------------------------------------------
+# ----------------------------------------------------------------
+# BEFORE / AFTER TOGGLE
+# ----------------------------------------------------------------
 view_mode = st.radio(
     "Select Data Mode:",
-    ["Raw AQI (Before Processing)", "Risk-Processed (After Normalisation & Index)"],
+    ["Before Processing (Raw AQI)", "After Processing (Normalised Risk Index)"],
     horizontal=True
 )
 
-# RAW AGGREGATE (before processing)
-raw_agg = df[["country"] + pollutants].groupby("country").mean().reset_index()
+# ================================================================
+# MODE 1 — BEFORE PROCESSING (RAW AQI)
+# ================================================================
+if view_mode.startswith("Before"):
 
-if view_mode == "Raw AQI (Before Processing)":
+    st.subheader("🌫 Raw AQI — Before Processing")
+    selected_pollutant = st.selectbox("Select pollutant:", raw_pollutants)
 
-    st.subheader("🌫 Raw Pollutant Levels (Before Processing)")
-    pollutant_raw = st.selectbox("Select pollutant:", pollutants)
-
-    raw_plot_df = raw_agg.sort_values(pollutant_raw, ascending=False).head(25)
+    raw_agg = raw_g.groupby("Country", as_index=False)[selected_pollutant].mean()
+    top_raw = raw_agg.sort_values(selected_pollutant, ascending=False).head(25)
 
     fig_raw = px.bar(
-        raw_plot_df,
-        x="country",
-        y=pollutant_raw,
-        title=f"Top 25 Countries — Raw {pollutant_raw}",
-        labels={pollutant_raw: "AQI (Raw)"}
+        top_raw,
+        x="Country",
+        y=selected_pollutant,
+        title=f"Top 25 Countries — Raw {selected_pollutant}",
+        color=selected_pollutant,
+        color_continuous_scale="Reds"
     )
-    fig_raw.update_layout(height=450)
+    fig_raw.update_layout(height=450, xaxis_tickangle=45)
     st.plotly_chart(fig_raw, use_container_width=True)
 
     st.info(
-        "You are viewing the raw dataset BEFORE any scaling or risk index computation.\n"
-        "Switch to **Risk-Processed Mode** (top toggle) to explore the full advanced analytics."
+        "You are currently viewing **raw AQI data before any cleaning**.\n\n"
+        "Switch to *After Processing* to explore the fully normalised risk index and advanced analytics."
     )
 
     st.stop()
 
-# =====================================================================
-# FROM HERE: AFTER PROCESSING MODE (risk index computations)
-# =====================================================================
+# ================================================================
+# MODE 2 — AFTER PROCESSING (NORMALISED RISK)
+# ================================================================
+# Compute mean pollutants per country
+agg_df = processed_df[["country"] + proc_pollutants].groupby("country").mean().reset_index()
 
-# -------------------------------------------------------------
-# BUILD RISK INDEX (NORMALISED)
-# -------------------------------------------------------------
-agg_df = raw_agg.copy()
-
+# Normalised values
 scaled = {}
-for col in pollutants:
+for col in proc_pollutants:
     s = agg_df[col].astype(float)
     lo, hi = s.min(), s.max()
     scaled[col] = (s - lo) / (hi - lo) if hi > lo else np.zeros_like(s)
 
 scaled_df = pd.DataFrame(scaled)
 
+# Composite risk index
 agg_df["risk_index"] = scaled_df.mean(axis=1)
-agg_df["risk_index_raw"] = scaled_df.sum(axis=1)
 agg_df["risk_percentile"] = agg_df["risk_index"].rank(pct=True)
 
-
-# =====================================================================
-# 🟦 SECTION 1 — RANKING CONTROLS
-# =====================================================================
+# ================================================================
+# SECTION 1 — RANKING CONTROLS
+# ================================================================
 st.subheader("1. Country Ranking Controls")
 
 colA, colB = st.columns(2)
@@ -311,18 +308,18 @@ colA, colB = st.columns(2)
 with colA:
     ranking_mode = st.selectbox(
         "Risk Ranking Mode",
-        ["Highest Risk", "Lowest Risk", "Middle (Average)", "Custom Percentile Range"]
+        ["Highest Risk", "Lowest Risk", "Middle Range", "Custom Percentile Range"]
     )
 
 with colB:
     metric_mode = st.selectbox(
-        "Ranking Metric",
-        ["Overall Risk Index"] + pollutants
+        "Plot Metric",
+        ["Overall Risk Index"] + proc_pollutants
     )
 
-# Custom percentile range
+# Custom range slider
 if ranking_mode == "Custom Percentile Range":
-    pct_min, pct_max = st.slider("Percentile Range", 0.0, 1.0, (0.20, 0.80), 0.01)
+    pct_min, pct_max = st.slider("Select Percentile Range", 0.0, 1.0, (0.20, 0.80), 0.01)
 else:
     pct_min, pct_max = 0.0, 1.0
 
@@ -330,13 +327,10 @@ rank_df = agg_df.copy()
 
 if ranking_mode == "Highest Risk":
     rank_df = rank_df.sort_values("risk_index", ascending=False)
-
 elif ranking_mode == "Lowest Risk":
     rank_df = rank_df.sort_values("risk_index", ascending=True)
-
-elif ranking_mode == "Middle (Average)":
+elif ranking_mode == "Middle Range":
     rank_df = rank_df[(rank_df["risk_percentile"] > 0.33) & (rank_df["risk_percentile"] < 0.66)]
-
 elif ranking_mode == "Custom Percentile Range":
     rank_df = rank_df[
         (rank_df["risk_percentile"] >= pct_min) &
@@ -345,12 +339,12 @@ elif ranking_mode == "Custom Percentile Range":
 
 metric_col = "risk_index" if metric_mode == "Overall Risk Index" else metric_mode
 
-# -------------------------------------------------------------
-# PLOT RANKING
-# -------------------------------------------------------------
+# ================================================================
+# SECTION 2 — RANKING BAR CHART
+# ================================================================
 st.subheader("2. Ranked Countries (Bar Chart)")
 
-top_n = st.slider("Show Top N", 5, 40, 15)
+top_n = st.slider("Show Top N Countries", 5, 40, 15)
 plot_df = rank_df.head(top_n)
 
 fig_rank = px.bar(
@@ -359,22 +353,20 @@ fig_rank = px.bar(
     y=metric_col,
     color="risk_index",
     color_continuous_scale="Reds",
-    title=f"Top {top_n} Countries — Metric: {metric_mode}"
+    title=f"Top {top_n} Countries — {metric_mode}"
 )
-fig_rank.update_layout(height=450)
-fig_rank.update_xaxes(tickangle=45)
+fig_rank.update_layout(height=450, xaxis_tickangle=45)
 st.plotly_chart(fig_rank, use_container_width=True)
 
-
-# =====================================================================
-# 🟩 SECTION 2 — DUAL AXIS: RISK vs POLLUTANT
-# =====================================================================
+# ================================================================
+# SECTION 3 — DUAL AXIS RISK vs POLLUTANT
+# ================================================================
 st.subheader("3. Dual-Axis Comparison (Risk vs Pollutant)")
 
 col1, col2 = st.columns(2)
 
 with col1:
-    pollutant_choice = st.selectbox("Select Pollutant:", pollutants)
+    pollutant_choice = st.selectbox("Select Pollutant:", proc_pollutants)
 
 with col2:
     dual_n = st.slider("Number of Countries", 5, 25, 10)
@@ -396,7 +388,7 @@ fig_dual.add_trace(go.Scatter(
     name=pollutant_choice,
     mode="lines+markers",
     yaxis="y2",
-    marker=dict(color="#0ea5e9"),
+    marker=dict(color="#0ea5e9")
 ))
 
 fig_dual.update_layout(
@@ -407,13 +399,12 @@ fig_dual.update_layout(
 
 st.plotly_chart(fig_dual, use_container_width=True)
 
+# ================================================================
+# SECTION 4 — HEATMAP
+# ================================================================
+st.subheader("4. Pollutant Heatmap")
 
-# =====================================================================
-# 🟧 SECTION 3 — HEATMAP
-# =====================================================================
-st.subheader("4. Pollutant Heatmap (Countries × Pollutants)")
-
-heat_df = agg_df.set_index("country")[pollutants]
+heat_df = agg_df.set_index("country")[proc_pollutants]
 
 fig_heat = px.imshow(
     heat_df,
@@ -423,21 +414,20 @@ fig_heat = px.imshow(
 )
 st.plotly_chart(fig_heat, use_container_width=True)
 
-
-# =====================================================================
-# 🟪 SECTION 4 — RADAR CHART
-# =====================================================================
+# ================================================================
+# SECTION 5 — RADAR CHART
+# ================================================================
 st.subheader("5. Radar Chart — Compare Countries")
 
 compare_list = st.multiselect(
-    "Choose up to 3 countries",
+    "Select Countries (max 3)",
     agg_df["country"].unique(),
     default=agg_df["country"].head(3).tolist()
 )
 
 if compare_list:
     radar_df = agg_df[agg_df["country"].isin(compare_list)]
-    categories = pollutants
+    categories = proc_pollutants
 
     fig_radar = go.Figure()
 
@@ -445,7 +435,7 @@ if compare_list:
         fig_radar.add_trace(go.Scatterpolar(
             r=[row[p] for p in categories],
             theta=categories,
-            fill='toself',
+            fill="toself",
             name=row["country"]
         ))
 
@@ -455,4 +445,3 @@ if compare_list:
     )
 
     st.plotly_chart(fig_radar, use_container_width=True)
-
