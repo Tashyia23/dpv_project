@@ -1,75 +1,100 @@
+# pages/2_📊_AQI_Summary.py
 import streamlit as st
 import plotly.express as px
 from utils.loader import load_base_data
 from utils.ui import header
 
 st.set_page_config(layout="wide")
-
-# Load dataset
 base_df = load_base_data()
+
+def get_metric_options(df):
+    col_map = {}
+    if "aqi_value" in df.columns:
+        col_map["Overall AQI Value"] = "aqi_value"
+    if "pm25_aqi_value" in df.columns:
+        col_map["PM2.5 AQI Value"] = "pm25_aqi_value"
+    if "pm10_aqi_value" in df.columns:
+        col_map["PM10 AQI Value"] = "pm10_aqi_value"
+    if "co_aqi_value" in df.columns:
+        col_map["CO AQI Value"] = "co_aqi_value"
+    if "no2_aqi_value" in df.columns:
+        col_map["NO₂ AQI Value"] = "no2_aqi_value"
+    if "ozone_aqi_value" in df.columns:
+        col_map["O₃ AQI Value"] = "ozone_aqi_value"
+    if not col_map:
+        numeric_cols = df.select_dtypes(include="number").columns.tolist()
+        for c in numeric_cols:
+            pretty = c.replace("_", " ").title()
+            col_map[pretty] = c
+    return col_map
+
+metric_options = get_metric_options(base_df)
 
 header(
     "📊 AQI Summary",
-    "Explore AQI distributions, summary statistics, and pollutant correlations."
+    "Explore the distribution, summary statistics, and correlations between pollutant-specific AQI values."
 )
 
-# ----------------------------------------------------
-# Select metric
-# ----------------------------------------------------
-numeric_cols = [c for c in base_df.columns if base_df[c].dtype != "object"]
-default_metric = "aqi_value" if "aqi_value" in numeric_cols else numeric_cols[0]
-
-metric = st.selectbox(
-    "Select AQI metric to summarise:",
-    numeric_cols,
-    index=numeric_cols.index(default_metric),
+metric_label = st.selectbox(
+    "Metric to summarise",
+    list(metric_options.keys()),
+    key="summary_metric",
 )
+metric_col = metric_options[metric_label]
 
-# ----------------------------------------------------
-# Layout
-# ----------------------------------------------------
-col1, col2 = st.columns([0.55, 0.45])
+left, right = st.columns([0.52, 0.48])
 
-# ----- Histogram
-with col1:
-    st.markdown("### Distribution")
+with left:
+    st.markdown("<div class='chart-card'>", unsafe_allow_html=True)
+    st.markdown("#### Distribution")
     fig_hist = px.histogram(
         base_df,
-        x=metric,
+        x=metric_col,
         nbins=40,
-        color_discrete_sequence=["#2563eb"]
+        title=None,
     )
-    fig_hist.update_layout(height=400)
+    fig_hist.update_layout(
+        height=400,
+        margin=dict(l=0, r=0, t=10, b=0),
+        paper_bgcolor="rgba(0,0,0,0)",
+        plot_bgcolor="rgba(0,0,0,0)",
+    )
     st.plotly_chart(fig_hist, use_container_width=True)
+    st.markdown("</div>", unsafe_allow_html=True)
 
-# ----- Stats Table
-with col2:
-    st.markdown("### Summary Statistics")
-    desc = base_df[metric].describe().to_frame("Value")
-    st.dataframe(desc)
+with right:
+    st.markdown("<div class='chart-card'>", unsafe_allow_html=True)
+    st.markdown("#### Basic statistics")
+    desc = base_df[metric_col].describe()[["mean", "std", "min", "25%", "50%", "75%", "max"]]
+    st.dataframe(desc.to_frame("value"))
+    st.markdown("</div>", unsafe_allow_html=True)
 
-# ----------------------------------------------------
-# Correlation heatmap (pollutants only)
-# ----------------------------------------------------
+# Correlation heatmap
 pollutant_cols = [
-    c for c in base_df.columns
-    if c.endswith("_aqi_value") and c != "aqi_value"
+    c for c in base_df.columns if c.endswith("_aqi_value") and c != "aqi_value"
 ]
-
 if len(pollutant_cols) >= 2:
-    st.markdown("### Correlation Between Pollutants")
+    st.markdown("<div class='chart-card'>", unsafe_allow_html=True)
+    st.markdown("#### Correlation between pollutant-specific AQI values")
     corr = base_df[pollutant_cols].corr()
-
+    labels = [c.replace("_aqi_value", "").upper() for c in pollutant_cols]
     fig_corr = px.imshow(
         corr,
-        text_auto=True,
-        aspect="auto",
+        x=labels,
+        y=labels,
         color_continuous_scale="RdBu",
         zmin=-1,
         zmax=1,
-        labels=dict(color="Correlation"),
+        aspect="auto",
     )
-    fig_corr.update_layout(height=420)
+    fig_corr.update_layout(
+        height=400,
+        margin=dict(l=0, r=0, t=10, b=0),
+        paper_bgcolor="rgba(0,0,0,0)",
+        plot_bgcolor="rgba(0,0,0,0)",
+    )
     st.plotly_chart(fig_corr, use_container_width=True)
+    st.markdown("</div>", unsafe_allow_html=True)
 else:
-    st.info("Not enough pollutant-specific AQI columns to compute correlation.")
+    st.info("Not enough pollutant-specific columns to compute correlations.")
+
