@@ -1,29 +1,23 @@
+# utils/processor.py
 import pandas as pd
 import numpy as np
+from utils.preprocess import minmax_scale
 
-def assign_regions(df, region_map):
-    df["region"] = df["country"].map(region_map).fillna("Other")
+def add_risk_index(df):
+    """
+    Computes a basic 0–1 scaled risk index from *_aqi_value columns.
+    """
+    pollutant_cols = [c for c in df.columns if c.endswith("_aqi_value")]
+
+    if not pollutant_cols:
+        df["risk_index"] = np.nan
+        return df
+
+    scaled = {}
+    for col in pollutant_cols:
+        series = pd.to_numeric(df[col], errors="coerce")
+        scaled[col] = minmax_scale(series)
+
+    scaled_df = pd.DataFrame(scaled)
+    df["risk_index"] = scaled_df.mean(axis=1)
     return df
-
-def scale_columns(df, cols):
-    scaled = df.copy()
-    for col in cols:
-        series = scaled[col].astype(float)
-        lo, hi = series.min(), series.max()
-        scaled[col + "_scaled"] = (series - lo) / (hi - lo) if hi > lo else 0
-    return scaled
-
-def compute_risk_index(df, pollutants, weights):
-    df = df.copy()
-    for col in pollutants:
-        s = df[col].astype(float)
-        lo, hi = s.min(), s.max()
-        df[col + "_norm"] = (s - lo) / (hi - lo) if hi > lo else 0
-
-    df["risk_index"] = sum(
-        df[col + "_norm"] * weights[col] for col in pollutants
-    )
-    return df
-
-def merge_datasets(global_df, pm25_df):
-    return global_df.merge(pm25_df, on=["country", "year"], how="left")
