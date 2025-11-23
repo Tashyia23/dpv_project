@@ -185,57 +185,120 @@ def classify_risk(r):
 agg_df["risk_level"] = agg_df["risk_index"].apply(classify_risk)
 
 # ---------------------------------------------------
-# 3. Global KPIs
+# 3. Global risk overview
 # ---------------------------------------------------
-# ---------------------------------------------------
-# 2. Global risk overview (Improved UI)
-# ---------------------------------------------------
+
 st.markdown("<div class='chart-card'>", unsafe_allow_html=True)
 
 st.markdown("""
-<div style='font-size: 20px; font-weight: 700; margin-bottom: 10px;'>
-    🌍 2. Global Risk Overview
+<div style='font-size: 22px; font-weight: 800; margin-bottom: 12px;'>
+    🌍 Global Pollution Risk Overview
 </div>
 """, unsafe_allow_html=True)
+
+# Helper — convert country name to emoji flag
+def country_to_flag(country):
+    try:
+        return ''.join(chr(127397 + ord(c.upper())) for c in country if c.isalpha())
+    except:
+        return "🏳"
 
 avg_risk = agg_df["risk_index"].mean()
 worst_row = agg_df.loc[agg_df["risk_index"].idxmax()]
 best_row = agg_df.loc[agg_df["risk_index"].idxmin()]
 
-# 3 KPI cards
+# Create sparkline helper
+def sparkline(values):
+    import matplotlib.pyplot as plt
+    import io, base64
+
+    fig, ax = plt.subplots(figsize=(3, 0.4))
+    ax.plot(values, linewidth=2)
+    ax.set_axis_off()
+
+    buffer = io.BytesIO()
+    plt.savefig(buffer, format="png", bbox_inches="tight", transparent=True)
+    buffer.seek(0)
+    return base64.b64encode(buffer.read()).decode()
+
+# Generate mini sparkline for top/bottom country
+worst_spark = sparkline(worst_row[selected_pollutants].values)
+best_spark = sparkline(best_row[selected_pollutants].values)
+
 kpi1, kpi2, kpi3 = st.columns(3)
 
-# ---- Global Average Risk ----
+# ==========================
+# GLOBAL AVERAGE CARD
+# ==========================
 with kpi1:
-    st.markdown("""
-    <div class="kpi-card" style="text-align: center;">
-        <div class="kpi-label">🌐 Global Average Risk</div>
-        <div class="kpi-value" style="font-size: 1.6rem;">{:.2f}</div>
-        <div class="kpi-sub">Scaled index (0–1)</div>
-    </div>
-    """.format(avg_risk), unsafe_allow_html=True)
-
-# ---- Highest Risk Country ----
-with kpi2:
     st.markdown(f"""
-    <div class="kpi-card" style="text-align: center; border-left: 5px solid #ef4444;">
-        <div class="kpi-label">🔥 Highest Risk Country</div>
-        <div class="kpi-value" style="font-size: 1.4rem;">{worst_row['country']}</div>
-        <div class="kpi-sub">Index {worst_row['risk_index']:.2f} ({worst_row['risk_level']})</div>
+    <div class="kpi-card" style="
+        text-align: center;
+        background: linear-gradient(135deg, #dbeafe, #bfdbfe);
+        border-left: 6px solid #3b82f6;
+    ">
+        <div class="kpi-label">🌐 Global Average Risk</div>
+        <div class="kpi-value" style="font-size: 1.7rem;">{avg_risk:.2f}</div>
+        <div class="kpi-sub">Scaled index (0–1)</div>
     </div>
     """, unsafe_allow_html=True)
 
-# ---- Lowest Risk Country ----
-with kpi3:
+# ==========================
+# HIGHEST RISK CARD
+# ==========================
+with kpi2:
+    flag = country_to_flag(worst_row["country"])
     st.markdown(f"""
-    <div class="kpi-card" style="text-align: center; border-left: 5px solid #22c55e;">
+    <div class="kpi-card" style="
+        background: linear-gradient(135deg, #fecaca, #fca5a5);
+        border-left: 6px solid #ef4444;
+    ">
+        <div class="kpi-label">🔥 Highest Risk Country</div>
+        <div class="kpi-value" style="font-size: 1.2rem;">
+            {flag} {worst_row['country']}
+        </div>
+        <div class="kpi-sub">
+            Index {worst_row['risk_index']:.2f} ({worst_row['risk_level']})
+        </div>
+
+        <div style="margin-top: 8px; font-size: 0.7rem; color: #7f1d1d;">
+            <strong>Top ranked (#1)</strong> · Highest combined pollutant burden
+        </div>
+
+        <img src="data:image/png;base64,{worst_spark}" 
+             style="width:100%; margin-top:6px;" />
+    </div>
+    """, unsafe_allow_html=True)
+
+# ==========================
+# LOWEST RISK CARD
+# ==========================
+with kpi3:
+    flag = country_to_flag(best_row["country"])
+    st.markdown(f"""
+    <div class="kpi-card" style="
+        background: linear-gradient(135deg, #bbf7d0, #86efac);
+        border-left: 6px solid #22c55e;
+    ">
         <div class="kpi-label">🍃 Lowest Risk Country</div>
-        <div class="kpi-value" style="font-size: 1.4rem;">{best_row['country']}</div>
-        <div class="kpi-sub">Index {best_row['risk_index']:.2f} ({best_row['risk_level']})</div>
+        <div class="kpi-value" style="font-size: 1.2rem;">
+            {flag} {best_row['country']}
+        </div>
+        <div class="kpi-sub">
+            Index {best_row['risk_index']:.2f} ({best_row['risk_level']})
+        </div>
+
+        <div style="margin-top: 8px; font-size: 0.7rem; color: #065f46;">
+            <strong>#1 Cleanest</strong> · Lowest combined pollutant exposure
+        </div>
+
+        <img src="data:image/png;base64,{best_spark}" 
+             style="width:100%; margin-top:6px;" />
     </div>
     """, unsafe_allow_html=True)
 
 st.markdown("</div>", unsafe_allow_html=True)
+
 
 
 # ---------------------------------------------------
