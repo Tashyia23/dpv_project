@@ -2,7 +2,7 @@
 # import plotly.express as px
 # from utils.loader import load_base_data
 # from utils.ui import header
-from utils.loader import load_master_data
+#from utils.loader import load_master_data
 
 
 # st.set_page_config(layout="wide")
@@ -42,7 +42,7 @@ import streamlit as st
 import plotly.express as px
 import pandas as pd
 
-from utils.merged_datasets import load_master_dataset
+from utils.merged_dataset import load_merged_dataset
 from utils.ui import header
 
 st.set_page_config(layout="wide")
