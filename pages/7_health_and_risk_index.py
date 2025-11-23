@@ -2,7 +2,7 @@ import streamlit as st
 import numpy as np
 import pandas as pd
 import plotly.express as px
-
+from utils.loader import load_master_data
 from utils.loader import load_base_data
 from utils.ui import header
 
@@ -37,7 +37,9 @@ def mini_bar_chart(values, labels, max_width=160, height=8, colors=None):
 # ------------------------------------------------------------------------------------
 # Load Data
 # ------------------------------------------------------------------------------------
-df = load_base_data()
+# df = load_base_data()
+df = load_master_data()
+
 
 header("⚠ Health & Pollution Risk Index", "Combine multiple pollutants into a single risk score per country.")
 
