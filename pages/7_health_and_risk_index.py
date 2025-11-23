@@ -231,6 +231,85 @@ def classify(r):
 
 agg_df["risk_level"] = agg_df["risk_index"].apply(classify)
 
+# ====================================================================================
+# 5. WHO Health Impact Score (NEW FEATURE)
+# ====================================================================================
+
+st.markdown("### 🩺 WHO Health-Impact Scoring (Based on WHO Safe Thresholds)")
+
+# WHO AQI-equivalent safe thresholds
+who_thresholds = {
+    "pm25_aqi_value": 25,   # PM2.5
+    "pm10_aqi_value": 50,   # PM10
+    "no2_aqi_value": 33,    # NO2
+    "ozone_aqi_value": 70,  # Ozone
+    "co_aqi_value": 50,     # CO
+}
+
+# 1. Compute pollutant-level WHO scores
+impact_scores = {}
+
+for col in selected_pollutants:
+    if col in agg_df.columns:
+        threshold = who_thresholds.get(col, None)
+        if threshold:
+            impact_scores[col] = agg_df[col] / threshold
+        else:
+            impact_scores[col] = agg_df[col] * 0   # fallback
+
+impact_df = pd.DataFrame(impact_scores)
+agg_df["who_health_index"] = sum(
+    impact_df[c] * norm_weights[c] for c in selected_pollutants
+)
+
+# 2. Categorize into health danger levels
+def classify_health(idx):
+    if idx < 1: return "Safe"
+    if idx < 2: return "Moderate Risk"
+    if idx < 3: return "High Risk"
+    return "Severe Health Risk"
+
+agg_df["who_health_level"] = agg_df["who_health_index"].apply(classify_health)
+
+# 3. Show health-impact map
+st.markdown("#### 🗺 WHO Health Impact Map")
+
+who_fig = px.choropleth(
+    agg_df,
+    locations="country",
+    locationmode="country names",
+    color="who_health_index",
+    color_continuous_scale=["green", "yellow", "orange", "red", "darkred"],
+    title="WHO Health Impact Index (Based on Safe Pollutant Limits)",
+)
+
+st.plotly_chart(who_fig, use_container_width=True)
+
+# 4. Table of top highest WHO risk countries
+st.markdown("#### 🚨 Highest WHO Health Threat Countries")
+
+top_who = agg_df.sort_values("who_health_index", ascending=False).head(15)
+
+st.dataframe(
+    top_who[
+        ["country", "who_health_index", "who_health_level"] + selected_pollutants
+    ]
+)
+
+# 5. Auto insights
+st.markdown("#### 🤖 WHO Health Insights")
+
+worst_country = top_who.iloc[0]
+best_country = agg_df.loc[agg_df["who_health_index"].idxmin()]
+
+st.markdown(f"""
+- 🚨 **Highest WHO health-risk country:** `{worst_country['country']}`  
+  WHO index = `{worst_country['who_health_index']:.2f}`
+- 🌱 **Lowest health-risk country:** `{best_country['country']}`  
+  WHO index = `{best_country['who_health_index']:.2f}`
+- 🔬 **Most dangerous pollutant globally:** `{max(norm_weights, key=norm_weights.get)}`
+""")
+
 
 # ====================================================================================
 # 4. RISK LEVEL TABS
