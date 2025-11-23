@@ -10,30 +10,46 @@ st.set_page_config(layout="wide")
 # ---------------------------------------------------
 # Mini horizontal bar generator (safe, SVG-free)
 # ---------------------------------------------------
+
 def mini_bar_chart(values, labels, max_width=130, height=6, colors=None):
     """
-    Creates small horizontal bars using CSS (no SVG, no plotly).
+    Creates small horizontal bars using CSS.
+    Bars are correctly scaled relative to max(values),
+    maintaining pollutant order.
     """
     if colors is None:
         colors = ["#8B5CF6", "#0EA5E9", "#F59E0B", "#EF4444", "#10B981"]
 
+    # ensure correct ordering
+    values = list(values)
+    labels = list(labels)
+
+    # correctly compute max
     max_val = max(values) if max(values) > 0 else 1
 
     rows = []
     for i, v in enumerate(values):
-        bar_width = int((v / max_val) * max_width)
+        bar_width = int((v / max_val) * max_width) if max_val > 0 else 0
         color = colors[i % len(colors)]
+
         rows.append(
             f"""
-            <div style="display:flex; align-items:center; margin-bottom:3px;">
-                <div style="width:65px; font-size:0.75rem; color:#374151;">{labels[i]}</div>
-                <div style="background:{color}; height:{height}px; width:{bar_width}px; border-radius:4px; margin-right:6px;"></div>
+            <div style="display:flex; align-items:center; margin-bottom:4px;">
+                <div style="width:120px; font-size:0.75rem; color:#374151;">
+                    {labels[i]}
+                </div>
+                <div style="background:{color};
+                            height:{height}px;
+                            width:{bar_width}px;
+                            border-radius:4px;
+                            margin-right:6px;">
+                </div>
                 <div style="font-size:0.7rem; color:#6B7280;">{v:.2f}</div>
             </div>
             """
         )
-    return "<div>" + "".join(rows) + "</div>"
 
+    return "<div>" + "".join(rows) + "</div>"
 
 # ---------------------------------------------------
 # Load data
