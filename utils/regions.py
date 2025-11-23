@@ -5,7 +5,7 @@ from typing import Dict, Set
 # -------------------------------
 # 1. Region Groups (by country)
 # -------------------------------
-REGION_GROUPS: Dict[str, Set[str]] = {
+REGION_MAP: Dict[str, Set[str]] = {
     "Asia": {
         "Afghanistan", "Armenia", "Azerbaijan", "Bahrain", "Bangladesh", "Bhutan",
         "Cambodia", "China", "Georgia", "India", "Indonesia",
@@ -66,30 +66,18 @@ REGION_GROUPS: Dict[str, Set[str]] = {
     },
 }
 
-# -------------------------------
-# 2. Region Colours
-# -------------------------------
-REGION_COLORS: Dict[str, str] = {
-    "Asia": "#EF4444",           # red
-    "Europe": "#3B82F6",         # blue
-    "Africa": "#10B981",         # green
-    "North America": "#F59E0B",  # amber
-    "South America": "#8B5CF6",  # violet
-    "Oceania": "#EC4899",        # pink
-    "Other": "#6B7280",          # grey fallback
+def assign_region(country: str):
+    return REGION_MAP.get(country, "Other")
+
+
+REGION_COLORS = {
+    "North America": "#2563eb",
+    "South America": "#059669",
+    "Europe": "#db2777",
+    "Asia": "#f59e0b",
+    "Africa": "#7c3aed",
+    "Oceania": "#e11d48",
+    "Other": "#6b7280",
 }
 
-
-def assign_region(country: str) -> str:
-    """
-    Map a country name to a world region.
-    If not found, returns 'Other'.
-    """
-    if not isinstance(country, str):
-        return "Other"
-
-    for region, countries in REGION_GROUPS.items():
-        if country in countries:
-            return region
-    return "Other"
 
