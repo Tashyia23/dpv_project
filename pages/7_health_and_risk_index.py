@@ -4,6 +4,9 @@ import pandas as pd
 import plotly.express as px
 from utils.loader import load_base_data
 from utils.ui import header
+import plotly.graph_objects as go
+import base64
+import io
 
 st.set_page_config(layout="wide")
 
@@ -208,19 +211,31 @@ worst_row = agg_df.loc[agg_df["risk_index"].idxmax()]
 best_row = agg_df.loc[agg_df["risk_index"].idxmin()]
 
 # Create sparkline helper
+
 def sparkline(values):
-    import matplotlib.pyplot as plt
-    import io, base64
+    fig = go.Figure()
+    fig.add_trace(go.Scatter(
+        y=values,
+        mode="lines",
+        line=dict(width=2, color="#1f77b4"),
+        hoverinfo="skip"
+    ))
 
-    fig, ax = plt.subplots(figsize=(3, 0.4))
-    ax.plot(values, linewidth=2)
-    ax.set_axis_off()
+    fig.update_layout(
+        xaxis=dict(visible=False),
+        yaxis=dict(visible=False),
+        paper_bgcolor="rgba(0,0,0,0)",
+        plot_bgcolor="rgba(0,0,0,0)",
+        margin=dict(l=0, r=0, t=0, b=0),
+        height=40,
+        width=180,
+    )
 
+    # Export Plotly figure as PNG then convert to base64
     buffer = io.BytesIO()
-    plt.savefig(buffer, format="png", bbox_inches="tight", transparent=True)
+    fig.write_image(buffer, format="png", scale=3)
     buffer.seek(0)
     return base64.b64encode(buffer.read()).decode()
-
 # Generate mini sparkline for top/bottom country
 worst_spark = sparkline(worst_row[selected_pollutants].values)
 best_spark = sparkline(best_row[selected_pollutants].values)
