@@ -5,7 +5,6 @@ import plotly.express as px
 
 from utils.loader import load_base_data
 from utils.ui import header
-from utils.regions import REGION_COLORS 
 
 st.set_page_config(layout="wide")
 
@@ -308,15 +307,6 @@ st.markdown("### 3. Country Risk Ranking")
 # -------------------------------
 # 🔹 TOGGLE 1 – Ranking Type
 # -------------------------------
-
-region_list = sorted(agg_df["region"].dropna().unique())
-selected_regions = st.multiselect(
-    "Filter by region",
-    region_list,
-    default=region_list,
-)
-
-filtered = agg_df[agg_df["region"].isin(selected_regions)].copy()
 
 ranking_mode = st.radio(
     "Select ranking type:",
