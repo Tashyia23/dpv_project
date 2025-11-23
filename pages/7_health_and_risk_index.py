@@ -14,27 +14,55 @@ st.set_page_config(layout="wide")
 # ------------------------------------------------------------------------------------
 # Mini Bar UI
 # ------------------------------------------------------------------------------------
-def mini_bar_chart(values, labels, max_width=160, height=8, colors=None):
-    if colors is None:
-        colors = ["#7C3AED", "#0EA5E9", "#F59E0B", "#EF4444", "#10B981"]
+# def mini_bar_chart(values, labels, max_width=160, height=8, colors=None):
+#     if colors is None:
+#         colors = ["#7C3AED", "#0EA5E9", "#F59E0B", "#EF4444", "#10B981"]
 
-    html = "<div>"
+#     html = "<div>"
+#     max_val = max(values) if max(values) else 1
+
+#     for i, v in enumerate(values):
+#         width = int((v / max_val) * max_width) if max_val > 0 else 0
+#         color = colors[i % len(colors)]
+#         html += f"""
+#         <div style='display:flex;align-items:center;gap:10px;margin-bottom:6px;'>
+#             <div style='width:150px;font-size:0.80rem;font-weight:500;color:#374151;'>{labels[i]}</div>
+#             <div style='flex-grow:1;max-width:{max_width}px;background:#E5E7EB;border-radius:4px;height:{height}px;'>
+#                 <div style='background:{color};width:{width}px;height:{height}px;border-radius:4px;'></div>
+#             </div>
+#             <div style='width:45px;text-align:right;font-size:0.80rem;color:#374151;'>{v:.2f}</div>
+#         </div>
+#         """
+#     html += "</div>"
+#     return html
+
+#________________
+
+def mini_bar_chart(values, labels, max_width=220, height=10, colors=None):
+    if colors is None:
+        colors = ["#8B5CF6", "#0EA5E9", "#F59E0B", "#EF4444", "#10B981"]
+
+    html = "<div style='margin-top:5px;'>"
     max_val = max(values) if max(values) else 1
 
     for i, v in enumerate(values):
-        width = int((v / max_val) * max_width) if max_val > 0 else 0
+        width = int((v / max_val) * max_width)
         color = colors[i % len(colors)]
+
         html += f"""
-        <div style='display:flex;align-items:center;gap:10px;margin-bottom:6px;'>
-            <div style='width:150px;font-size:0.80rem;font-weight:500;color:#374151;'>{labels[i]}</div>
-            <div style='flex-grow:1;max-width:{max_width}px;background:#E5E7EB;border-radius:4px;height:{height}px;'>
-                <div style='background:{color};width:{width}px;height:{height}px;border-radius:4px;'></div>
+        <div style='margin-bottom:10px;'>
+            <div style='font-size:0.80rem;color:#374151;font-weight:500;margin-bottom:2px;'>{labels[i]}</div>
+
+            <div style='background:#E5E7EB;border-radius:6px;height:{height}px;width:{max_width}px;'>
+                <div style='background:{color};width:{width}px;height:{height}px;border-radius:6px;'></div>
             </div>
-            <div style='width:45px;text-align:right;font-size:0.80rem;color:#374151;'>{v:.2f}</div>
+
+            <div style='font-size:0.75rem;color:#4B5563;margin-top:2px;text-align:right;width:{max_width}px;'>{v:.2f}</div>
         </div>
         """
     html += "</div>"
     return html
+
 
 
 # ------------------------------------------------------------------------------------
@@ -437,10 +465,121 @@ st.markdown(
 # ----------------------------------------------
 # 6. Compare Two Countries (Side-by-Side)
 # ----------------------------------------------
-st.markdown("### 6. Compare Two Countries (Side-by-Side Analysis)")
+# st.markdown("### 6. Compare Two Countries (Side-by-Side Analysis)")
+
+# colA, colB = st.columns(2)
+
+# with colA:
+#     country_a = st.selectbox(
+#         "Select Country A",
+#         agg_df["country"].sort_values().unique(),
+#         key="country_a",
+#     )
+
+# with colB:
+#     country_b = st.selectbox(
+#         "Select Country B",
+#         agg_df["country"].sort_values().unique(),
+#         key="country_b",
+#     )
+
+# if country_a == country_b:
+#     st.warning("⚠ Please choose two different countries for comparison.")
+# else:
+#     import streamlit.components.v1 as components
+
+#     # Fetch rows
+#     a_row = agg_df[agg_df["country"] == country_a].iloc[0]
+#     b_row = agg_df[agg_df["country"] == country_b].iloc[0]
+
+#     # Get pollutant labels + values
+#     labels = [pollutant_info[c][1] for c in selected_pollutants]
+#     a_vals = [float(a_row[c]) for c in selected_pollutants]
+#     b_vals = [float(b_row[c]) for c in selected_pollutants]
+
+#     # --- 2 Internal side-by-side columns ---
+#     cA, cB = st.columns(2)
+
+#     # --------------------------------------
+#     # LEFT COUNTRY CARD
+#     # --------------------------------------
+#     with cA:
+#         st.markdown(
+#             f"""
+#             <div class="kpi-card">
+#                 <div class="kpi-label">{country_a}</div>
+#                 <div class="kpi-value">{a_row['risk_index']:.2f}</div>
+#                 <div class="kpi-sub">Risk Level: {a_row['risk_level']}</div>
+#             </div>
+#             """,
+#             unsafe_allow_html=True,
+#         )
+
+#         st.markdown("#### Pollutant Breakdown")
+#         components.html(mini_bar_chart(a_vals, labels), height=240)
+
+#     # --------------------------------------
+#     # RIGHT COUNTRY CARD
+#     # --------------------------------------
+#     with cB:
+#         st.markdown(
+#             f"""
+#             <div class="kpi-card">
+#                 <div class="kpi-label">{country_b}</div>
+#                 <div class="kpi-value">{b_row['risk_index']:.2f}</div>
+#                 <div class="kpi-sub">Risk Level: {b_row['risk_level']}</div>
+#             </div>
+#             """,
+#             unsafe_allow_html=True,
+#         )
+
+#         st.markdown("#### Pollutant Breakdown")
+#         components.html(mini_bar_chart(b_vals, labels), height=240)
+
+#     # --------------------------------------
+#     # INTERPRETATION
+#     # --------------------------------------
+#     st.markdown("### 🔍 Interpretation")
+
+#     diff = a_row["risk_index"] - b_row["risk_index"]
+#     higher = country_a if diff > 0 else country_b
+#     gap = abs(diff)
+
+#     key_pollutant = labels[
+#         np.argmax(np.abs(np.array(a_vals) - np.array(b_vals)))
+#     ]
+
+#     st.markdown(
+#         f"""
+#         **Comparison Summary**
+#         - **Higher composite risk:** `{higher}`  
+#         - **Risk gap:** `{gap:.2f}`  
+#         - **Key differing pollutant:** `{key_pollutant}`  
+#         """
+#     )
+
+#     comp_df = pd.DataFrame(
+#         {
+#             "Pollutant": labels,
+#             country_a: a_vals,
+#             country_b: b_vals,
+#             "Difference": np.array(a_vals) - np.array(b_vals),
+#         }
+#     )
+
+#     st.dataframe(
+#         comp_df.style.format(
+#             {country_a: "{:.2f}", country_b: "{:.2f}", "Difference": "{:.2f}"}
+#         )
+#     )
+
+#_______________
+
+st.markdown("## 6. Compare Two Countries (Side-by-Side Analysis)")
 
 colA, colB = st.columns(2)
 
+# Country Selectors
 with colA:
     country_a = st.selectbox(
         "Select Country A",
@@ -455,96 +594,90 @@ with colB:
         key="country_b",
     )
 
+# If same country → warn
 if country_a == country_b:
     st.warning("⚠ Please choose two different countries for comparison.")
-else:
-    import streamlit.components.v1 as components
+    st.stop()
 
-    # Fetch rows
-    a_row = agg_df[agg_df["country"] == country_a].iloc[0]
-    b_row = agg_df[agg_df["country"] == country_b].iloc[0]
+# Extract rows
+a_row = agg_df[agg_df["country"] == country_a].iloc[0]
+b_row = agg_df[agg_df["country"] == country_b].iloc[0]
 
-    # Get pollutant labels + values
-    labels = [pollutant_info[c][1] for c in selected_pollutants]
-    a_vals = [float(a_row[c]) for c in selected_pollutants]
-    b_vals = [float(b_row[c]) for c in selected_pollutants]
+labels = [pollutant_info[c][1] for c in selected_pollutants]
+a_vals = [float(a_row[c]) for c in selected_pollutants]
+b_vals = [float(b_row[c]) for c in selected_pollutants]
 
-    # --- 2 Internal side-by-side columns ---
-    cA, cB = st.columns(2)
+# UI Layout – Beautiful clean card design
+left, right = st.columns(2)
 
-    # --------------------------------------
-    # LEFT COUNTRY CARD
-    # --------------------------------------
-    with cA:
-        st.markdown(
-            f"""
-            <div class="kpi-card">
-                <div class="kpi-label">{country_a}</div>
-                <div class="kpi-value">{a_row['risk_index']:.2f}</div>
-                <div class="kpi-sub">Risk Level: {a_row['risk_level']}</div>
-            </div>
-            """,
-            unsafe_allow_html=True,
-        )
-
-        st.markdown("#### Pollutant Breakdown")
-        components.html(mini_bar_chart(a_vals, labels), height=240)
-
-    # --------------------------------------
-    # RIGHT COUNTRY CARD
-    # --------------------------------------
-    with cB:
-        st.markdown(
-            f"""
-            <div class="kpi-card">
-                <div class="kpi-label">{country_b}</div>
-                <div class="kpi-value">{b_row['risk_index']:.2f}</div>
-                <div class="kpi-sub">Risk Level: {b_row['risk_level']}</div>
-            </div>
-            """,
-            unsafe_allow_html=True,
-        )
-
-        st.markdown("#### Pollutant Breakdown")
-        components.html(mini_bar_chart(b_vals, labels), height=240)
-
-    # --------------------------------------
-    # INTERPRETATION
-    # --------------------------------------
-    st.markdown("### 🔍 Interpretation")
-
-    diff = a_row["risk_index"] - b_row["risk_index"]
-    higher = country_a if diff > 0 else country_b
-    gap = abs(diff)
-
-    key_pollutant = labels[
-        np.argmax(np.abs(np.array(a_vals) - np.array(b_vals)))
-    ]
-
+# ---------------- CARD A ----------------
+with left:
     st.markdown(
         f"""
-        **Comparison Summary**
-        - **Higher composite risk:** `{higher}`  
-        - **Risk gap:** `{gap:.2f}`  
-        - **Key differing pollutant:** `{key_pollutant}`  
-        """
+        <div style="padding:20px;border-radius:12px;border:1px solid #E5E7EB;background:white;">
+            <div style="font-size:1.3rem;font-weight:600;color:#1F2937;">{country_a}</div>
+            <div style="font-size:2rem;font-weight:700;color:#4F46E5;">{a_row['risk_index']:.2f}</div>
+            <div style="font-size:1rem;color:#6B7280;">Risk Level: <b>{a_row['risk_level']}</b></div>
+        </div>
+        """,
+        unsafe_allow_html=True,
     )
 
-    comp_df = pd.DataFrame(
-        {
-            "Pollutant": labels,
-            country_a: a_vals,
-            country_b: b_vals,
-            "Difference": np.array(a_vals) - np.array(b_vals),
-        }
+    st.markdown("### Pollutant Breakdown")
+    st.markdown(mini_bar_chart(a_vals, labels), unsafe_allow_html=True)
+
+# ---------------- CARD B ----------------
+with right:
+    st.markdown(
+        f"""
+        <div style="padding:20px;border-radius:12px;border:1px solid #E5E7EB;background:white;">
+            <div style="font-size:1.3rem;font-weight:600;color:#1F2937;">{country_b}</div>
+            <div style="font-size:2rem;font-weight:700;color:#4F46E5;">{b_row['risk_index']:.2f}</div>
+            <div style="font-size:1rem;color:#6B7280;">Risk Level: <b>{b_row['risk_level']}</b></div>
+        </div>
+        """,
+        unsafe_allow_html=True,
     )
 
-    st.dataframe(
-        comp_df.style.format(
-            {country_a: "{:.2f}", country_b: "{:.2f}", "Difference": "{:.2f}"}
-        )
-    )
+    st.markdown("### Pollutant Breakdown")
+    st.markdown(mini_bar_chart(b_vals, labels), unsafe_allow_html=True)
 
+
+# ---------------- INTERPRETATION ----------------
+st.markdown("### 🔍 Interpretation")
+
+diff = a_row["risk_index"] - b_row["risk_index"]
+higher = country_a if diff > 0 else country_b
+gap = abs(diff)
+
+key_pollutant = labels[
+    np.argmax(np.abs(np.array(a_vals) - np.array(b_vals)))
+]
+
+st.markdown(
+    f"""
+    **Comparison Summary**
+    - **Higher composite risk:** `{higher}`
+    - **Risk gap:** `{gap:.2f}`
+    - **Key differing pollutant:** `{key_pollutant}`
+    """
+)
+
+# Detailed Table
+comp_df = pd.DataFrame(
+    {
+        "Pollutant": labels,
+        country_a: a_vals,
+        country_b: b_vals,
+        "Difference": np.array(a_vals) - np.array(b_vals),
+    }
+)
+
+st.dataframe(
+    comp_df.style.format(
+        {country_a: "{:.2f}", country_b: "{:.2f}", "Difference": "{:.2f}"}
+    )
+)
 
 
 # ====================================================================================
