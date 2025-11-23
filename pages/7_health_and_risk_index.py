@@ -4,6 +4,7 @@ import pandas as pd
 import plotly.express as px
 from utils.loader import load_base_data
 from utils.ui import header
+from utils.regions import assign_region
 
 st.set_page_config(layout="wide")
 
@@ -44,6 +45,7 @@ if "country" not in df.columns:
     st.error("Dataset missing column 'country'")
     st.stop()
 
+df["region"] = df["country"].apply(assign_region)
 
 # ------------------------------------------------------------------------------------
 # 1. Configure Risk Score
