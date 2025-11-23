@@ -8,45 +8,32 @@ from utils.ui import header
 st.set_page_config(layout="wide")
 
 # ---------------------------------------------------
-# Mini horizontal bar chart (Option B – fixed)
+# Mini horizontal bar chart 
 # ---------------------------------------------------
 def mini_bar_chart(values, labels, max_width=160, height=8, colors=None):
-    """
-    Streamlit-safe mini horizontal bars using HTML + CSS.
-    """
     if colors is None:
         colors = ["#7C3AED", "#0EA5E9", "#F59E0B", "#EF4444", "#10B981"]
 
-    values = list(values)
-    labels = list(labels)
-    max_val = max(values) if max(values) > 0 else 1
+    html = "<div>"
+    max_val = max(values) if max(values) else 1
 
-    rows = []
     for i, v in enumerate(values):
-        width = int((v / max_val) * max_width) if max_val else 0
+        width = int((v / max_val) * max_width)
         color = colors[i % len(colors)]
 
-        rows.append(f"""
-        <div style="display:flex; align-items:center; gap:10px; margin-bottom:6px;">
-            <div style="width:150px; font-size:0.80rem; font-weight:500; color:#374151;">
-                {labels[i]}
-            </div>
+        html += (
+            "<div style='display:flex;align-items:center;gap:10px;margin-bottom:6px;'>"
+            f"<div style='width:150px;font-size:0.80rem;font-weight:500;color:#374151;'>{labels[i]}</div>"
+            f"<div style='flex-grow:1;max-width:{max_width}px;background:#E5E7EB;border-radius:4px;height:{height}px;'>"
+            f"<div style='background:{color};width:{width}px;height:{height}px;border-radius:4px;'></div>"
+            "</div>"
+            f"<div style='width:45px;text-align:right;font-size:0.80rem;color:#374151;'>{v:.2f}</div>"
+            "</div>"
+        )
 
-            <div style="flex-grow:1; max-width:{max_width}px;
-                        background:#E5E7EB; border-radius:4px; height:{height}px;">
-                <div style="background:{color};
-                            width:{width}px;
-                            height:{height}px; border-radius:4px;">
-                </div>
-            </div>
+    html += "</div>"
+    return html
 
-            <div style="width:45px; text-align:right; font-size:0.80rem; color:#374151;">
-                {v:.2f}
-            </div>
-        </div>
-        """)
-
-    return "<div>" + "".join(rows) + "</div>"
 
 
 # ---------------------------------------------------
