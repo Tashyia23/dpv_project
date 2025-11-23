@@ -16,7 +16,7 @@ st.set_page_config(layout="wide")
 # ---------------------------------------------------------
 # 1. Load merged global dataset
 # ---------------------------------------------------------
-df = md.load_master_data()
+df = load_master_data()
 
 # df = load_base_data()
 
