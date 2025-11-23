@@ -415,7 +415,7 @@ import numpy as np
 import pandas as pd
 import plotly.express as px
 
-from utils.loader import load_base_data   # ✅ single, stable loader import
+from utils.data_loader import load_processed_dataset
 from utils.ui import header
 
 st.set_page_config(layout="wide")
@@ -449,7 +449,8 @@ def mini_bar_chart(values, labels, max_width=160, height=8, colors=None):
 # ------------------------------------------------------------------------------------
 # Load Data (RAW – before processing)
 # ------------------------------------------------------------------------------------
-df = load_base_data()
+
+df = load_processed_dataset()
 
 header(
     "⚠ Health & Pollution Risk Index",
