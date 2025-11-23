@@ -192,6 +192,97 @@ if view_mode.startswith("Before"):
     with st.expander("Show raw aggregated table per country"):
         st.dataframe(raw_agg, use_container_width=True)
 
+
+
+        # -------------------------------------------------------------------------
+    # 📊 EXTRA RAW VISUALISATIONS (Histogram, Boxplot, Heatmap, Scatter)
+    # -------------------------------------------------------------------------
+    st.markdown("### 1B. Additional Visualisations (Raw AQI)")
+
+    colX, colY = st.columns(2)
+
+    # HISTOGRAM
+    with colX:
+        st.markdown("#### 📉 Histogram")
+        fig_hist = px.histogram(
+            raw_g,
+            x=selected_raw,
+            nbins=40,
+            title=f"Histogram of {pretty_raw_labels[selected_raw]}",
+            marginal="box",
+            color_discrete_sequence=["#6366F1"]
+        )
+        fig_hist.update_layout(height=350)
+        st.plotly_chart(fig_hist, use_container_width=True)
+
+    # BOX PLOT
+    with colY:
+        st.markdown("#### 📦 Box Plot")
+        fig_box = px.box(
+            raw_g,
+            y=selected_raw,
+            points="all",
+            title=f"Box Plot of {pretty_raw_labels[selected_raw]}",
+            color_discrete_sequence=["#EC4899"]
+        )
+        fig_box.update_layout(height=350)
+        st.plotly_chart(fig_box, use_container_width=True)
+
+    st.markdown("---")
+
+    # CORRELATION HEATMAP
+    st.markdown("#### 🔥 Correlation Heatmap (Across Raw Pollutants)")
+    corr_cols = available_raw_cols
+    corr_df = raw_g[corr_cols].corr()
+
+    fig_corr = px.imshow(
+        corr_df,
+        text_auto=True,
+        aspect="auto",
+        title="Correlation Between Raw AQI Pollutants",
+        color_continuous_scale="RdBu_r"
+    )
+    fig_corr.update_layout(height=450)
+    st.plotly_chart(fig_corr, use_container_width=True)
+
+    st.markdown("---")
+
+    # SCATTERPLOT (User selects 2 raw pollutants)
+    st.markdown("#### 🔍 Scatterplot Comparison (Two Raw Pollutants)")
+
+    colS1, colS2 = st.columns(2)
+
+    with colS1:
+        sc_x = st.selectbox(
+            "Select X-axis Pollutant:",
+            available_raw_cols,
+            format_func=lambda c: pretty_raw_labels[c],
+            key="scatter_x"
+        )
+
+    with colS2:
+        sc_y = st.selectbox(
+            "Select Y-axis Pollutant:",
+            available_raw_cols,
+            format_func=lambda c: pretty_raw_labels[c],
+            key="scatter_y"
+        )
+
+    fig_scatter = px.scatter(
+        raw_g,
+        x=sc_x,
+        y=sc_y,
+        title=f"{pretty_raw_labels[sc_x]} vs {pretty_raw_labels[sc_y]} (Raw AQI)",
+        trendline="ols",
+        opacity=0.7,
+        color_discrete_sequence=["#0EA5E9"]
+    )
+    fig_scatter.update_layout(height=450)
+    st.plotly_chart(fig_scatter, use_container_width=True)
+
+    st.markdown("---")
+
+
     # -------------------------------------------------------------------------
     # WHO Health-Impact Scoring on RAW AQI
     # -------------------------------------------------------------------------
@@ -792,3 +883,5 @@ st.markdown(
 - **Health levels (Safe / Moderate / High / Severe)** come from WHO-based exceedance.  
 """
 )
+
+
