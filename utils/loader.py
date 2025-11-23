@@ -51,20 +51,25 @@ def load_base_data() -> pd.DataFrame:
 
 
 @st.cache_data(ttl=600)
-def load_pm25_data() -> pd.DataFrame | None:
-    """PM2.5 exposure dataset (time-series), e.g. OWID dataset."""
+def load_pm25_data():
     try:
-        df = pd.read_csv("data/raw/pm25-air-pollution.csv")
-    except FileNotFoundError:
+        path = "data/raw/pm25-air-pollution.csv"
+        df = pd.read_csv(path)
+
+        # Clean column names
+        df.columns = [c.strip().lower().replace(" ", "_") for c in df.columns]
+
+        # Ensure proper naming
+        if "year" not in df.columns and "Year" in df.columns:
+            df = df.rename(columns={"Year": "year"})
+
+        if "entity" in df.columns:
+            df = df.rename(columns={"entity": "country"})
+
+        return df
+
+    except Exception as e:
+        print("Error loading PM2.5 data:", e)
         return None
 
-    df.columns = (
-        df.columns.str.strip()
-        .str.lower()
-        .str.replace(" ", "_")
-        .str.replace("(", "", regex=False)
-        .str.replace(")", "", regex=False)
-        .str.replace(".", "", regex=False)
-    )
-    return df
 
