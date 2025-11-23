@@ -1,61 +1,102 @@
+# pages/6_📈_PM25_Trends.py
 import streamlit as st
 import plotly.express as px
 from utils.loader import load_pm25_data
 from utils.ui import header
 
 st.set_page_config(layout="wide")
-
 pm25_df = load_pm25_data()
 
 header(
-    "📈 PM2.5 Trends (2010–2019)",
-    "Compare historical exposure across countries."
+    "📈 PM2.5 Trends",
+    "Inspect long-term PM2.5 exposure trends and compare multiple countries over time."
 )
 
 if pm25_df is None:
-    st.error("PM2.5 dataset missing.")
+    st.warning("The PM2.5 dataset (`pm25-air-pollution.csv`) was not found in `data/raw/`.")
     st.stop()
 
-pm_country = "country"
-pm_year = "year"
-pm_value = [c for c in pm25_df.columns if c not in [pm_country, pm_year]][0]
+pm_country_col = "country" if "country" in pm25_df.columns else pm25_df.columns[0]
+pm_year_col = "year" if "year" in pm25_df.columns else pm25_df.columns[1]
 
-countries = sorted(pm25_df[pm_country].dropna().unique())
-default = countries[:3]
+numeric_cols = pm25_df.select_dtypes(include="number").columns.tolist()
+if pm_year_col in numeric_cols:
+    numeric_cols.remove(pm_year_col)
+pm_value_col = numeric_cols[0] if numeric_cols else None
 
-selected = st.multiselect(
-    "Choose countries to compare:",
+if pm_value_col is None:
+    st.error("Could not find a numeric PM2.5 column in `pm25-air-pollution.csv`.")
+    st.stop()
+
+countries = sorted(pm25_df[pm_country_col].dropna().unique().tolist())
+default_countries = countries[:3] if len(countries) >= 3 else countries
+
+selected_countries = st.multiselect(
+    "Choose countries to compare",
     countries,
-    default=default
+    default=default_countries,
+    key="pm25_countries",
 )
 
-if not selected:
-    st.info("Select at least one country.")
+if not selected_countries:
+    st.info("Select at least one country to display the trend.")
     st.stop()
 
-df_c = pm25_df[pm25_df[pm_country].isin(selected)].sort_values(pm_year)
+df_c = pm25_df[pm25_df[pm_country_col].isin(selected_countries)].copy()
+df_c = df_c.sort_values(pm_year_col)
 
-fig = px.line(
+# Year range filter (hybrid upgrade)
+year_min = int(df_c[pm_year_col].min())
+year_max = int(df_c[pm_year_col].max())
+year_range = st.slider(
+    "Year range",
+    min_value=year_min,
+    max_value=year_max,
+    value=(year_min, year_max),
+    step=1,
+)
+df_c = df_c[(df_c[pm_year_col] >= year_range[0]) & (df_c[pm_year_col] <= year_range[1])]
+
+st.markdown("<div class='chart-card'>", unsafe_allow_html=True)
+fig_line = px.line(
     df_c,
-    x=pm_year,
-    y=pm_value,
-    color=pm_country,
+    x=pm_year_col,
+    y=pm_value_col,
+    color=pm_country_col,
     markers=True,
-    labels={"y": "PM2.5 (µg/m³)"},
-    title="PM2.5 Exposure Trends",
-    color_discrete_sequence=px.colors.qualitative.Set2
+    labels={pm_year_col: "Year", pm_value_col: "PM2.5 (μg/m³)"},
+    title="PM2.5 trend over time – multi-country comparison",
+    color_discrete_sequence=px.colors.qualitative.Set2,
 )
+fig_line.update_layout(
+    height=440,
+    margin=dict(l=0, r=0, t=40, b=0),
+    paper_bgcolor="rgba(0,0,0,0)",
+    plot_bgcolor="rgba(0,0,0,0)",
+)
+st.plotly_chart(fig_line, use_container_width=True)
+st.markdown("</div>", unsafe_allow_html=True)
 
-fig.update_layout(height=450)
-st.plotly_chart(fig, use_container_width=True)
-
-# Latest values
 latest = (
-    df_c.sort_values(pm_year)
-        .groupby(pm_country)
-        .tail(1)
-        .sort_values(pm_value, ascending=False)
+    df_c.sort_values(pm_year_col)
+    .groupby(pm_country_col)
+    .tail(1)[[pm_country_col, pm_year_col, pm_value_col]]
+    .sort_values(pm_value_col, ascending=False)
 )
 
-st.markdown("### Latest Available PM2.5 Readings")
-st.dataframe(latest[[pm_country, pm_year, pm_value]])
+st.markdown("<div class='chart-card'>", unsafe_allow_html=True)
+st.markdown("#### Latest available PM2.5 values by country")
+st.dataframe(
+    latest.rename(
+        columns={
+            pm_country_col: "Country",
+            pm_year_col: "Latest year",
+            pm_value_col: "PM2.5 (μg/m³)",
+        }
+    )
+)
+st.markdown("</div>", unsafe_allow_html=True)
+
+with st.expander("Show full PM2.5 data table used in this view"):
+    st.dataframe(df_c[[pm_country_col, pm_year_col, pm_value_col]])
+
