@@ -6,6 +6,9 @@ import plotly.express as px
 from utils.data_loader import load_raw_dataset, load_processed_dataset
 from utils.ui import header
 
+import streamlit.components.v1 as components
+
+
 st.set_page_config(layout="wide")
 
 # ------------------------------------------------------------------------------------
@@ -536,19 +539,37 @@ st.markdown("### 6. Compare Two Countries (Side-by-Side Analysis)")
 
 colA, colB = st.columns(2)
 
-with colA:
-    country_a = st.selectbox(
-        "Select Country A",
-        agg_df["country"].sort_values().unique(),
-        key="country_a",
+
+with cA:
+    st.markdown(
+        f"""
+    <div class="kpi-card">
+        <div class="kpi-label">{country_a}</div>
+        <div class="kpi-value">{a_row['risk_index']:.2f}</div>
+        <div class="kpi-sub">Risk Level: {a_row['risk_level']}</div>
+    </div>
+    """,
+        unsafe_allow_html=True,
     )
 
-with colB:
-    country_b = st.selectbox(
-        "Select Country B",
-        agg_df["country"].sort_values().unique(),
-        key="country_b",
+    st.markdown("#### Pollutant Breakdown")
+    components.html(mini_bar_chart(a_vals, labels), height=200)
+
+with cB:
+    st.markdown(
+        f"""
+    <div class="kpi-card">
+        <div class="kpi-label">{country_b}</div>
+        <div class="kpi-value">{b_row['risk_index']:.2f}</div>
+        <div class="kpi-sub">Risk Level: {b_row['risk_level']}</div>
+    </div>
+    """,
+        unsafe_allow_html=True,
     )
+
+    st.markdown("#### Pollutant Breakdown")
+    components.html(mini_bar_chart(b_vals, labels), height=200)
+
 
 # Prevent same-country comparison
 if country_a == country_b:
