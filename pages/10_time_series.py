@@ -43,12 +43,16 @@ pm_col = pm_cols[0]
 # ---------------------------------------------------------
 # Sidebar Controls
 # ---------------------------------------------------------
-st.sidebar.header("🔎 Time-Series Options")
+# ---------------------------------------------------------
+# View Mode Toggle (TOP AREA)
+# ---------------------------------------------------------
+st.subheader("📊 Choose Trend View")
 
-mode = st.sidebar.radio(
-    "Trend mode:",
-    ["Global Trend", "Single Country", "Compare Countries"]
+mode = st.segmented_control(
+    "Trend Mode",
+    ["Global Trend", "Single Country", "Compare Countries"],
 )
+
 
 # ---------------------------------------------------------
 # GLOBAL TREND
