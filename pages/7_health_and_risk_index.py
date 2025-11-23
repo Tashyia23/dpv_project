@@ -298,6 +298,71 @@ else:
 # 6. Country Risk Ranking
 # ====================================================================================
 
+# -----------------------------------------
+# POLLUTANT RANKING MODE (NEW FEATURE)
+# -----------------------------------------
+ranking_type = st.radio(
+    "Ranking mode:",
+    ["Overall Risk Index", "PM2.5", "NO₂", "O₃", "CO", "PM10"],
+    horizontal=True
+)
+
+# Map pollutant names to dataset columns
+pollutant_cols = {
+    "PM2.5": "pm25_aqi_value",
+    "PM10": "pm10_aqi_value" if "pm10_aqi_value" in df.columns else None,
+    "NO₂": "no2_aqi_value",
+    "O₃": "ozone_aqi_value",
+    "CO": "co_aqi_value"
+}
+
+# Determine which ranking mode to use
+if ranking_type == "Overall Risk Index":
+    metric_col = "risk_index"
+    metric_label = "Overall Risk Index"
+else:
+    metric_col = pollutant_cols[ranking_type]
+    metric_label = f"{ranking_type} AQI Value"
+
+# Handle unavailable pollutants safely
+if metric_col is None:
+    st.warning(f"⚠ Your dataset does not contain {ranking_type}.")
+    st.stop()
+
+# -----------------------------------------
+# Show N countries for this metric
+# -----------------------------------------
+top_n = st.slider(f"Show top N countries by {metric_label}", 5, 30, 10)
+
+display_df = agg_df.sort_values(metric_col, ascending=False).head(top_n)
+
+title = f"Top {top_n} Countries ({metric_label})"
+
+# -----------------------------------------
+# PLOT — Clean bar chart for pollutant ranking
+# -----------------------------------------
+fig = px.bar(
+    display_df,
+    x="country", y=metric_col,
+    title=title,
+    color="risk_level",
+    color_discrete_map={
+        "Low": "#22c55e",
+        "Moderate": "#eab308",
+        "High": "#f97316",
+        "Very High": "#ef4444",
+    }
+)
+
+fig.update_traces(text=None, hovertemplate="<b>%{x}</b><br>Value: %{y:.2f}")
+fig.update_layout(height=450, margin=dict(l=0, r=0, t=40, b=0))
+
+st.plotly_chart(fig, use_container_width=True)
+
+with st.expander("Show full table"):
+    st.dataframe(display_df)
+
+
 st.markdown("<div class='chart-card'>", unsafe_allow_html=True)
 st.markdown("### 3. Country Risk Ranking")
 
