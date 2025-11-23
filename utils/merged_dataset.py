@@ -40,3 +40,6 @@ def load_merged_dataset():
 
     return merged_df
 
+def load_master_dataset():
+    return load_merged_dataset()
+
