@@ -1,327 +1,153 @@
-# pages/10_time_series.py
-
 import streamlit as st
 import pandas as pd
 import numpy as np
 import plotly.express as px
-
-from utils.loader import load_base_data
+from utils.loader import load_pm25_data
 from utils.ui import header
 
 st.set_page_config(layout="wide")
 
-
-# ---------------------------------------------------
-# Helper: Plotly line styling
-# ---------------------------------------------------
-def style_line_fig(fig, height=420):
-    fig.update_layout(
-        height=height,
-        margin=dict(l=0, r=0, t=50, b=0),
-        legend_title=None,
-        template="plotly_white",
-    )
-    fig.update_xaxes(title_text="Year")
-    fig.update_yaxes(title_text=None)
-    return fig
-
-
-# ---------------------------------------------------
-# Load base data
-# ---------------------------------------------------
-df = load_base_data()
+# ---------------------------------------------------------
+# Load PM2.5 Dataset
+# ---------------------------------------------------------
+df = load_pm25_data()
 
 header(
     "📈 Time-Series Explorer",
-    "See how pollution levels evolve over time by country and region."
+    "How pollution levels evolve over time by country and region."
 )
 
-if "Year" not in df.columns:
-    st.error("The dataset does not contain a 'Year' column. Please check your data.")
+if df is None:
+    st.error("PM₂.₅ time-series dataset not found.")
     st.stop()
 
-# Make sure Year is numeric (int) and sorted
-df["Year"] = pd.to_numeric(df["Year"], errors="coerce")
-df = df.dropna(subset=["Year"])
-df["Year"] = df["Year"].astype(int)
-
-# Region safety (in case some rows are missing region)
-if "region" not in df.columns:
-    df["region"] = "Unknown"
-
-# ---------------------------------------------------
-# Pollutant options
-# ---------------------------------------------------
-pollutant_columns = [c for c in df.columns if c.endswith("_aqi_value")]
-
-if not pollutant_columns:
-    st.error("No pollutant *_aqi_value columns found in the dataset.")
+# ---------------------------------------------------------
+# FIX YEAR COLUMN (Your dataset uses 'Year', not 'year')
+# ---------------------------------------------------------
+if "Year" in df.columns and "year" not in df.columns:
+    df["year"] = df["Year"]
+elif "year" not in df.columns:
+    st.error("The dataset does not contain a 'Year' or 'year' column.")
     st.stop()
 
-pretty_names = {
-    "pm25_aqi_value": "PM₂.₅ (Fine Particles)",
-    "pm10_aqi_value": "PM₁₀ (Coarse Particles)",
-    "no2_aqi_value": "NO₂ (Nitrogen Dioxide)",
-    "ozone_aqi_value": "O₃ (Ozone)",
-    "co_aqi_value": "CO (Carbon Monoxide)",
-}
+# Clean and normalize year column
+df["year"] = pd.to_numeric(df["year"], errors="coerce")
+df = df.dropna(subset=["year"])
+df["year"] = df["year"].astype(int)
+df = df.sort_values("year")
 
-def format_pollutant(col: str) -> str:
-    return pretty_names.get(col, col)
+# ---------------------------------------------------------
+# Ensure clean country column
+# ---------------------------------------------------------
+if "entity" in df.columns:
+    df = df.rename(columns={"entity": "country"})
 
+if "country" not in df.columns:
+    st.error("The dataset must contain a 'country' column.")
+    st.stop()
 
-# ---------------------------------------------------
-# 1. Global Controls
-# ---------------------------------------------------
-st.markdown("<div class='chart-card'>", unsafe_allow_html=True)
-st.markdown("### 1. Time-Series Controls")
+# ---------------------------------------------------------
+# Detect PM2.5 values column
+# ---------------------------------------------------------
+value_cols = [c for c in df.columns if "pm25" in c or "pm2" in c]
 
-col_p1, col_p2, col_p3 = st.columns([2, 1.2, 1.2])
+if len(value_cols) == 0:
+    st.error("Could not find PM2.5 concentration column.")
+    st.stop()
 
-with col_p1:
-    pollutant = st.selectbox(
-        "Pollutant to analyse",
-        pollutant_columns,
-        index=pollutant_columns.index("pm25_aqi_value")
-        if "pm25_aqi_value" in pollutant_columns
-        else 0,
-        format_func=format_pollutant,
-    )
+pm_col = value_cols[0]  # first match
 
-with col_p2:
-    agg_func_label = st.selectbox(
-        "Aggregate by",
-        ["Mean (average)", "Median", "90th percentile"],
-    )
-    if agg_func_label.startswith("Mean"):
-        agg_func = np.mean
-    elif agg_func_label.startswith("Median"):
-        agg_func = np.median
-    else:
-        agg_func = lambda x: np.percentile(x, 90)
+# ---------------------------------------------------------
+# Sidebar Filters
+# ---------------------------------------------------------
+st.sidebar.header("🔎 Filters")
 
-with col_p3:
-    smooth_window = st.slider(
-        "Rolling window (Years)",
-        min_value=1,
-        max_value=5,
-        value=1,
-        help="Apply simple moving average smoothing over time.",
-    )
-
-st.markdown("</div>", unsafe_allow_html=True)
-
-metric_label = format_pollutant(pollutant)
-
-
-# ---------------------------------------------------
-# 2. Global Trend over Time
-# ---------------------------------------------------
-st.markdown("<div class='chart-card'>", unsafe_allow_html=True)
-st.markdown(f"### 2. Global Trend of {metric_label} Over Time")
-
-global_ts = (
-    df.groupby("Year")[pollutant]
-    .agg(agg_func)
-    .reset_index()
-    .rename(columns={pollutant: "value"})
-    .sort_values("Year")
+mode = st.sidebar.radio(
+    "Select View Mode:",
+    ["Global Trend", "Single Country", "Compare Countries"]
 )
 
-if smooth_window > 1:
-    global_ts["value_smooth"] = (
-        global_ts["value"].rolling(window=smooth_window, min_periods=1).mean()
-    )
-else:
-    global_ts["value_smooth"] = global_ts["value"]
+# ---------------------------------------------------------
+# GLOBAL TREND
+# ---------------------------------------------------------
+if mode == "Global Trend":
+    st.subheader("🌍 Global PM₂.₅ Trend Over Time")
 
-fig_global = px.line(
-    global_ts,
-    x="Year",
-    y="value_smooth",
-    markers=True,
-    title=f"Global {metric_label} ({agg_func_label})",
-)
+    global_df = df.groupby("year")[pm_col].mean().reset_index()
 
-fig_global = style_line_fig(fig_global)
-st.plotly_chart(fig_global, use_container_width=True)
-
-st.markdown("</div>", unsafe_allow_html=True)
-
-
-# ---------------------------------------------------
-# 3. Country & Multi-country Trends
-# ---------------------------------------------------
-st.markdown("<div class='chart-card'>", unsafe_allow_html=True)
-st.markdown("### 3. Country Time-Series Views")
-
-countries = sorted(df["country"].unique().tolist())
-
-# Default: top 5 by latest Year pollutant
-latest_Year = df["Year"].max()
-latest_df = df[df["Year"] == latest_Year]
-top_by_latest = (
-    latest_df.groupby("country")[pollutant]
-    .mean()
-    .sort_values(ascending=False)
-    .head(5)
-    .index.tolist()
-)
-
-col_c1, col_c2 = st.columns(2)
-
-# --- Single country view ---
-with col_c1:
-    st.markdown("#### a) Single Country vs Global Benchmark")
-    sel_country = st.selectbox(
-        "Select a country",
-        countries,
-        index=countries.index(top_by_latest[0]) if top_by_latest else 0,
-        key="ts_single_country",
-    )
-
-    country_ts = (
-        df[df["country"] == sel_country]
-        .groupby("Year")[pollutant]
-        .agg(agg_func)
-        .reset_index()
-        .rename(columns={pollutant: "value"})
-        .sort_values("Year")
-    )
-
-    # Add global for reference
-    merged = country_ts.merge(
-        global_ts[["Year", "value_smooth"]],
-        on="Year",
-        how="left",
-        suffixes=("_country", "_global"),
-    )
-
-    fig_country = px.line(
-        merged,
-        x="Year",
-        y=["value_country", "value_smooth"],
+    fig = px.line(
+        global_df,
+        x="year",
+        y=pm_col,
         markers=True,
-        labels={
-            "value_country": sel_country,
-            "value_smooth": "Global",
-        },
-        title=f"{metric_label} in {sel_country} vs Global ({agg_func_label})",
+        title="Global Average PM₂.₅ Over Time",
+        labels={pm_col: "PM₂.₅ Concentration (μg/m³)"},
     )
-    fig_country = style_line_fig(fig_country)
-    st.plotly_chart(fig_country, use_container_width=True)
+    st.plotly_chart(fig, use_container_width=True)
 
-# --- Multi-country comparison ---
-with col_c2:
-    st.markdown("#### b) Compare Multiple Countries")
+# ---------------------------------------------------------
+# SINGLE COUNTRY MODE
+# ---------------------------------------------------------
+elif mode == "Single Country":
 
-    default_multi = top_by_latest[:3] if len(top_by_latest) >= 3 else countries[:3]
+    st.subheader("🇨🇺 Country Trend Over Time")
 
-    sel_multi = st.multiselect(
-        "Select countries to compare (max 6)",
-        countries,
-        default=default_multi,
-        key="ts_multi_country",
-    )
+    countries = sorted(df["country"].unique())
+    country = st.selectbox("Select country:", countries)
 
-    sel_multi = sel_multi[:6]  # hard cap
+    cdf = df[df["country"] == country]
 
-    if sel_multi:
-        multi_ts = (
-            df[df["country"].isin(sel_multi)]
-            .groupby(["country", "Year"])[pollutant]
-            .agg(agg_func)
-            .reset_index()
-            .rename(columns={pollutant: "value"})
-            .sort_values(["country", "Year"])
-        )
-
-        fig_multi = px.line(
-            multi_ts,
-            x="Year",
-            y="value",
-            color="country",
-            markers=True,
-            title=f"{metric_label} – Multi-country Comparison ({agg_func_label})",
-        )
-        fig_multi = style_line_fig(fig_multi)
-        st.plotly_chart(fig_multi, use_container_width=True)
-    else:
-        st.info("Select at least one country to view the comparison chart.")
-
-st.markdown("</div>", unsafe_allow_html=True)
-
-
-# ---------------------------------------------------
-# 4. Regional Time-Series
-# ---------------------------------------------------
-st.markdown("<div class='chart-card'>", unsafe_allow_html=True)
-st.markdown("### 4. Regional Time-Series")
-
-regions = sorted(df["region"].unique().tolist())
-
-col_r1, col_r2 = st.columns([2, 1])
-
-with col_r1:
-    sel_regions = st.multiselect(
-        "Regions to compare",
-        regions,
-        default=regions if len(regions) <= 5 else regions[:5],
-    )
-
-with col_r2:
-    normalize = st.checkbox(
-        "Normalise each region (index to first Year = 100)",
-        value=False,
-        help="Helps compare relative growth/decline rather than absolute levels.",
-    )
-
-if sel_regions:
-    reg_ts = (
-        df[df["region"].isin(sel_regions)]
-        .groupby(["region", "Year"])[pollutant]
-        .agg(agg_func)
-        .reset_index()
-        .rename(columns={pollutant: "value"})
-        .sort_values(["region", "Year"])
-    )
-
-    if normalize:
-        reg_ts["value_norm"] = reg_ts.groupby("region")["value"].apply(
-            lambda x: (x / x.iloc[0]) * 100 if x.iloc[0] != 0 else x * 0
-        )
-        y_col = "value_norm"
-        y_title = f"{metric_label} – indexed to first Year (100)"
-    else:
-        y_col = "value"
-        y_title = metric_label
-
-    fig_region = px.line(
-        reg_ts,
-        x="Year",
-        y=y_col,
-        color="region",
+    fig = px.line(
+        cdf,
+        x="year",
+        y=pm_col,
         markers=True,
-        title=f"Regional {metric_label} Over Time ({agg_func_label})",
+        title=f"PM₂.₅ Trend — {country}",
+        labels={pm_col: "PM₂.₅ Concentration (μg/m³)"},
     )
-    fig_region = style_line_fig(fig_region)
-    fig_region.update_yaxes(title_text=y_title)
 
-    st.plotly_chart(fig_region, use_container_width=True)
-else:
-    st.info("Choose at least one region to view regional time-series.")
+    st.plotly_chart(fig, use_container_width=True)
 
-st.markdown("</div>", unsafe_allow_html=True)
+# ---------------------------------------------------------
+# COMPARE MULTIPLE COUNTRIES
+# ---------------------------------------------------------
+elif mode == "Compare Countries":
 
+    st.subheader("🌐 Compare Multiple Countries")
 
-# ---------------------------------------------------
-# 5. Data table (optional explorer)
-# ---------------------------------------------------
-with st.expander("🔍 Show underlying time-series data"):
-    cols_to_show = ["country", "region", "Year"] + pollutant_columns
-    existing_cols = [c for c in cols_to_show if c in df.columns]
-    st.dataframe(
-        df[existing_cols]
-        .sort_values(["country", "Year"])
-        .reset_index(drop=True)
+    countries = sorted(df["country"].unique())
+    selected = st.multiselect(
+        "Choose countries to compare:",
+        countries,
+        default=["Afghanistan", "India", "China"][:3]
     )
+
+    if len(selected) < 1:
+        st.info("Select at least one country.")
+        st.stop()
+
+    comp_df = df[df["country"].isin(selected)]
+
+    fig = px.line(
+        comp_df,
+        x="year",
+        y=pm_col,
+        color="country",
+        markers=True,
+        title="Country Comparison — PM₂.₅ Levels",
+        labels={pm_col: "PM₂.₅ Concentration (μg/m³)"},
+    )
+
+    fig.update_layout(legend_title_text="Country")
+
+    st.plotly_chart(fig, use_container_width=True)
+
+# ---------------------------------------------------------
+# Additional Summary Statistics
+# ---------------------------------------------------------
+st.markdown("### 📊 Summary Statistics")
+
+summary = df.groupby("year")[pm_col].agg(["mean", "min", "max"]).reset_index()
+
+st.dataframe(summary, use_container_width=True)
+
