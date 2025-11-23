@@ -82,76 +82,165 @@
 
 
 #_____________________________
-# utils/regions.py
 
-import pycountry
-from rapidfuzz import process
+import os
+import json
+import requests
+from typing import Dict, Set
 
-# --------------------------------
-# 1. Region lookup using pycountry
-# --------------------------------
-def get_country_region(country_name: str) -> str:
+# ----------------------------------------------------
+# 1. ORIGINAL MANUAL REGION MAP (fallback layer)
+# ----------------------------------------------------
+REGION_MAP: Dict[str, Set[str]] = {
+    "Asia": {
+        "Afghanistan", "Armenia", "Azerbaijan", "Bahrain", "Bangladesh",
+        "Bhutan", "Cambodia", "China", "Georgia", "India", "Indonesia",
+        "Iran (Islamic Republic of)", "Iraq", "Israel", "Japan", "Jordan",
+        "Kazakhstan", "Kuwait", "Kyrgyzstan", "Lao People's Democratic Republic",
+        "Lebanon", "Malaysia", "Maldives", "Mongolia", "Myanmar", "Nepal",
+        "Oman", "Pakistan", "Philippines", "Qatar", "Republic of Korea",
+        "Saudi Arabia", "Singapore", "Sri Lanka", "State of Palestine",
+        "Syrian Arab Republic", "Tajikistan", "Thailand", "Turkey",
+        "Turkmenistan", "United Arab Emirates", "Uzbekistan", "Viet Nam",
+        "Yemen",
+    },
+
+    "Europe": {
+        "Albania", "Andorra", "Austria", "Belarus", "Belgium",
+        "Bosnia and Herzegovina", "Bulgaria", "Croatia", "Czechia", "Denmark",
+        "Estonia", "Finland", "France", "Germany", "Greece", "Hungary",
+        "Iceland", "Ireland", "Italy", "Latvia", "Lithuania", "Luxembourg",
+        "Malta", "Monaco", "Montenegro", "Netherlands",
+        "Republic of Moldova", "Republic of North Macedonia",
+        "Norway", "Poland", "Portugal", "Romania",
+        "Russian Federation", "Serbia", "Slovakia", "Slovenia",
+        "Spain", "Sweden", "Switzerland", "Ukraine",
+        "United Kingdom of Great Britain and Northern Ireland", "Cyprus",
+    },
+
+    "Africa": {
+        "Algeria", "Angola", "Benin", "Botswana", "Burkina Faso", "Burundi",
+        "Cabo Verde", "Cameroon", "Central African Republic", "Chad",
+        "Comoros", "Congo", "Côte d'Ivoire", "Democratic Republic of the Congo",
+        "Egypt", "Equatorial Guinea", "Eritrea", "Eswatini", "Ethiopia",
+        "Gabon", "Gambia", "Ghana", "Guinea", "Guinea-Bissau", "Kenya",
+        "Lesotho", "Liberia", "Libya", "Madagascar", "Malawi", "Mali",
+        "Mauritania", "Mauritius", "Morocco", "Mozambique", "Namibia", "Niger",
+        "Nigeria", "Rwanda", "Senegal", "Seychelles", "Sierra Leone", "Somalia",
+        "South Africa", "South Sudan", "Sudan", "Togo", "Tunisia", "Uganda",
+        "United Republic of Tanzania", "Zambia", "Zimbabwe",
+    },
+
+    "North America": {
+        "Canada", "United States of America", "Mexico", "Belize",
+        "Costa Rica", "Cuba", "Dominican Republic", "El Salvador",
+        "Guatemala", "Haiti", "Honduras", "Nicaragua", "Panama",
+        "Jamaica", "Trinidad and Tobago", "Barbados", "Saint Kitts and Nevis",
+        "Saint Lucia", "Aruba",
+    },
+
+    "South America": {
+        "Argentina", "Bolivia (Plurinational State of)", "Brazil",
+        "Chile", "Colombia", "Ecuador", "Guyana", "Paraguay", "Peru",
+        "Suriname", "Uruguay", "Venezuela (Bolivarian Republic of)",
+    },
+
+    "Oceania": {
+        "Australia", "New Zealand", "Papua New Guinea",
+        "Solomon Islands", "Vanuatu", "Palau",
+    },
+}
+
+REGION_COLORS = {
+    "North America": "#2563eb",
+    "South America": "#059669",
+    "Europe": "#db2777",
+    "Asia": "#f59e0b",
+    "Africa": "#7c3aed",
+    "Oceania": "#e11d48",
+    "Other": "#6b7280",
+}
+
+# ----------------------------------------------------
+# 2. CACHE FILE PATH
+# ----------------------------------------------------
+CACHE_PATH = os.path.join(os.path.dirname(__file__), "region_cache.json")
+
+def _load_cache():
+    if os.path.exists(CACHE_PATH):
+        with open(CACHE_PATH, "r", encoding="utf-8") as f:
+            return json.load(f)
+    return {}
+
+def _save_cache(cache):
+    with open(CACHE_PATH, "w", encoding="utf-8") as f:
+        json.dump(cache, f, indent=2)
+
+# ----------------------------------------------------
+# 3. API LOOKUP FUNCTION
+# ----------------------------------------------------
+def fetch_region_from_api(country: str) -> str:
     """
-    Attempts to detect a country's region automatically:
-    - Handles alternate spellings
-    - Handles abbreviations
-    - Uses fuzzy matching for inconsistent names
+    Uses the public API at RESTCountries to detect region.
+    Example endpoint:
+      https://restcountries.com/v3.1/name/Malaysia?fields=region
     """
-
-    if not isinstance(country_name, str) or country_name.strip() == "":
-        return "Other"
-
-    # Try exact match first
     try:
-        country = pycountry.countries.lookup(country_name)
-    except LookupError:
-        country = None
+        url = f"https://restcountries.com/v3.1/name/{country}?fields=region"
+        res = requests.get(url, timeout=3)
 
-    # If lookup fails → fuzzy match from pycountry list
-    if country is None:
-        names = [c.name for c in pycountry.countries]
-        match, score, _ = process.extractOne(country_name, names)
+        if res.status_code != 200:
+            return None
 
-        if score >= 85:  # strong match threshold
-            country = pycountry.countries.get(name=match)
+        data = res.json()
+        if isinstance(data, list) and "region" in data[0]:
+            return data[0]["region"]
 
-    if country is None:
-        return "Other"
+        return None
 
-    # Now detect region via pycountry subdivisions
-    try:
-        # Some countries have a single default subdivision listing region
-        subdivisions = list(pycountry.subdivisions.get(country_code=country.alpha_2))
-        if subdivisions:
-            region = subdivisions[0].type
-            if region in ["Asia", "Europe", "Africa", "Americas", "Oceania"]:
-                return region
     except Exception:
-        pass
+        return None
 
-    # Manual continent mapping fallback
-    continent_map = {
-        "AF": "Africa",
-        "AS": "Asia",
-        "EU": "Europe",
-        "NA": "North America",
-        "SA": "South America",
-        "OC": "Oceania",
-    }
+# ----------------------------------------------------
+# 4. HYBRID REGION DETECTOR
+# ----------------------------------------------------
+def assign_region(country: str) -> str:
+    """
+    Hybrid region detection:
+    1) Try cache
+    2) Try API
+    3) Try dictionary
+    4) Else → Other
+    """
+    if not country or not isinstance(country, str):
+        return "Other"
 
-    country_continent = getattr(country, "region", None)
+    country = country.strip()
 
-    # If pycountry detected region internally (depends on dataset)
-    if country_continent in continent_map.values():
-        return country_continent
+    # ----- (1) Check cache -----
+    cache = _load_cache()
+    if country in cache:
+        return cache[country]
 
-    # Alpha-2 to continent fallback
-    return continent_map.get(getattr(country, "alpha_2", ""), "Other")
+    # ----- (2) Try API -----
+    api_region = fetch_region_from_api(country)
+    if api_region:
+        cache[country] = api_region
+        _save_cache(cache)
+        return api_region
 
+    # ----- (3) Try dictionary -----
+    for region, countries in REGION_MAP.items():
+        if country in countries:
+            cache[country] = region
+            _save_cache(cache)
+            return region
 
-# Public function for Streamlit use
-def assign_region(name: str) -> str:
-    return get_country_region(name)
+    # ----- (4) Fallback -----
+    cache[country] = "Other"
+    _save_cache(cache)
+    return "Other"
+
 
 
 
