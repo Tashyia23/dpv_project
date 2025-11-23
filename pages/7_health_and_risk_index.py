@@ -268,17 +268,22 @@ if view_mode.startswith("Before"):
             key="scatter_y"
         )
 
-    fig_scatter = px.scatter(
-        raw_g,
-        x=sc_x,
-        y=sc_y,
-        title=f"{pretty_raw_labels[sc_x]} vs {pretty_raw_labels[sc_y]} (Raw AQI)",
-        trendline="ols",
-        opacity=0.7,
-        color_discrete_sequence=["#0EA5E9"]
-    )
-    fig_scatter.update_layout(height=450)
-    st.plotly_chart(fig_scatter, use_container_width=True)
+    # 🚨 Prevent duplicate selection
+    if sc_x == sc_y:
+        st.warning("⚠ Please choose two *different* pollutants for comparison.")
+    else:
+        fig_scatter = px.scatter(
+            raw_g,
+            x=sc_x,
+            y=sc_y,
+            title=f"{pretty_raw_labels[sc_x]} vs {pretty_raw_labels[sc_y]} (Raw AQI)",
+            trendline="ols",
+            opacity=0.7,
+            color_discrete_sequence=["#0EA5E9"]
+        )
+        fig_scatter.update_layout(height=450)
+        st.plotly_chart(fig_scatter, use_container_width=True)
+
 
     st.markdown("---")
 
