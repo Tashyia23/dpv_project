@@ -1,45 +1,84 @@
+
 # pages/4_🔍_Country_Deep_Dive.py
+
 import streamlit as st
 import plotly.express as px
 import numpy as np
-from utils.loader import load_master_data
+import pandas as pd
 
-from utils.loader import load_base_data, load_pm25_data
+from utils.merged_datasets import load_master_dataset
 from utils.ui import header
 
 st.set_page_config(layout="wide")
 
-#base_df = load_base_data()
-#pm25_df = load_pm25_data()
-
-df = load_master_data()
+# ---------------------------------------------------------
+# 1. Load merged dataset
+# ---------------------------------------------------------
+df = load_master_dataset()
 
 header(
     "🔍 Country Deep Dive",
-    "Single-country dashboard with current AQI profile, AQI health category, and historical PM2.5 exposure trends."
+    "Single-country dashboard with AQI profile, pollutant mix, health category, and PM2.5 historical exposure trends."
 )
 
-if pm25_df is None:
-    st.warning("The PM2.5 dataset (`pm25-air-pollution.csv`) was not found in `data/raw/`.")
+if df is None or df.empty:
+    st.error("Merged dataset could not be loaded.")
     st.stop()
 
-pm_country_col = "country" if "country" in pm25_df.columns else pm25_df.columns[0]
-pm_year_col = "year" if "year" in pm25_df.columns else pm25_df.columns[1]
+# ---------------------------------------------------------
+# 2. Auto-detect country column
+# ---------------------------------------------------------
+country_col = None
+for c in ["country", "Country", "entity", "Entity"]:
+    if c in df.columns:
+        country_col = c
+        break
 
-numeric_cols = pm25_df.select_dtypes(include="number").columns.tolist()
-if pm_year_col in numeric_cols:
-    numeric_cols.remove(pm_year_col)
-pm_value_col = numeric_cols[0] if numeric_cols else None
-if pm_value_col is None:
-    st.error("Could not find a numeric PM2.5 column in `pm25-air-pollution.csv`.")
+if country_col is None:
+    st.error("Dataset missing a country column.")
     st.stop()
 
-base_countries = set(base_df["country"].dropna().unique()) if "country" in base_df.columns else set()
-pm_countries = set(pm25_df[pm_country_col].dropna().unique())
-common_countries = sorted(list(base_countries & pm_countries)) or sorted(list(pm_countries))
+df["country"] = df[country_col].astype(str)
 
-selected_country = st.selectbox("Select a country", common_countries, key="deep_dive_country")
+# ---------------------------------------------------------
+# 3. Auto-detect pollutant AQI columns
+# ---------------------------------------------------------
+pollutant_cols = [c for c in df.columns if c.endswith("_aqi_value")]
 
+# ---------------------------------------------------------
+# 4. Auto-detect PM2.5 historical column
+# ---------------------------------------------------------
+pm_candidates = ["pm25", "pm25_mean", "pm25_concentration", "PM2.5"]
+pm25_col = next((c for c in pm_candidates if c in df.columns), None)
+
+if pm25_col is None:
+    st.warning("No PM2.5 historical column found in merged dataset.")
+    st.stop()
+
+# Auto-detect year column
+year_col = None
+for c in ["year", "Year", "YEAR"]:
+    if c in df.columns:
+        year_col = c
+        break
+
+if year_col is None:
+    st.warning("Dataset contains no 'year' column for historical PM2.5 trend.")
+    st.stop()
+
+df[year_col] = pd.to_numeric(df[year_col], errors="coerce")
+df = df.dropna(subset=[year_col])
+df[year_col] = df[year_col].astype(int)
+
+# ---------------------------------------------------------
+# 5. Country selection
+# ---------------------------------------------------------
+countries = sorted(df["country"].unique())
+selected_country = st.selectbox("Select a country", countries, key="deep_dive_country")
+
+# ---------------------------------------------------------
+# 6. AQI Category Function
+# ---------------------------------------------------------
 def classify_aqi(aqi: float) -> str:
     if aqi <= 50:
         return "Good"
@@ -54,99 +93,97 @@ def classify_aqi(aqi: float) -> str:
     else:
         return "Hazardous"
 
+# ---------------------------------------------------------
+# 7. Layout
+# ---------------------------------------------------------
 left, right = st.columns(2)
 
-# ----- Left: current AQI + pollutant mix + health message
+# ---------------------------------------------------------
+# LEFT — CURRENT AIR QUALITY + POLLUTANT MIX
+# ---------------------------------------------------------
 with left:
     st.markdown("<div class='chart-card'>", unsafe_allow_html=True)
-    st.markdown(f"#### Current Air Quality – {selected_country}")
-    df_c = base_df[base_df["country"] == selected_country]
+    st.markdown(f"### 🇺🇳 Current Air Quality — {selected_country}")
 
-    if df_c.empty:
-        st.info("No AQI data found for this country in the global air pollution dataset.")
+    df_now = df[df["country"] == selected_country]
+
+    if df_now.empty:
+        st.info("No AQI data found for this country.")
     else:
-        if "aqi_value" in df_c.columns:
-            avg_aqi = df_c["aqi_value"].mean()
+        # Overall AQI
+        if "aqi_value" in df_now.columns:
+            avg_aqi = df_now["aqi_value"].mean()
             st.metric("Average AQI (overall)", f"{avg_aqi:.1f}")
-            category = classify_aqi(avg_aqi)
-            st.info(f"**Air quality category:** {category}")
+            st.info(f"Air Quality Category: **{classify_aqi(avg_aqi)}**")
 
-        pollutant_cols = [
-            c for c in df_c.columns if c.endswith("_aqi_value") and c != "aqi_value"
-        ]
-        if pollutant_cols:
-            poll_avg = df_c[pollutant_cols].mean().reset_index()
+        # Pollutant Breakdown
+        pcols = [c for c in pollutant_cols if c in df_now.columns]
+        if pcols:
+            poll_avg = df_now[pcols].mean().reset_index()
             poll_avg.columns = ["pollutant", "aqi_value"]
             poll_avg["pollutant"] = (
-                poll_avg["pollutant"]
-                .str.replace("_aqi_value", "", regex=False)
-                .str.upper()
+                poll_avg["pollutant"].str.replace("_aqi_value", "", regex=False).str.upper()
             )
 
-            fig_poll = px.bar(
+            fig = px.bar(
                 poll_avg,
                 x="pollutant",
                 y="aqi_value",
-                labels={"aqi_value": "Average AQI"},
-                title="Average pollutant-specific AQI",
+                title="Average Pollutant-Specific AQI",
                 color="pollutant",
-                color_discrete_sequence=px.colors.qualitative.Set2,
+                color_discrete_sequence=px.colors.qualitative.Set2
             )
-            fig_poll.update_layout(
-                showlegend=False,
-                height=350,
-                margin=dict(l=0, r=0, t=45, b=0),
-                paper_bgcolor="rgba(0,0,0,0)",
-                plot_bgcolor="rgba(0,0,0,0)",
-            )
-            st.plotly_chart(fig_poll, use_container_width=True)
+            fig.update_layout(height=340, margin=dict(l=0, r=0, t=50, b=0))
+            st.plotly_chart(fig, use_container_width=True)
+
         else:
-            st.write("No pollutant-specific AQI columns to summarise.")
+            st.info("No pollutant-specific AQI values available.")
+
     st.markdown("</div>", unsafe_allow_html=True)
 
-# ----- Right: PM2.5 history + trend
+# ---------------------------------------------------------
+# RIGHT — PM2.5 TIME SERIES
+# ---------------------------------------------------------
 with right:
     st.markdown("<div class='chart-card'>", unsafe_allow_html=True)
-    st.markdown(f"#### PM2.5 Exposure Over Time – {selected_country}")
-    df_pm = pm25_df[pm25_df[pm_country_col] == selected_country].copy()
-    df_pm = df_pm.sort_values(pm_year_col)
+    st.markdown(f"### 📈 PM2.5 Historical Trend — {selected_country}")
+
+    df_pm = df[df["country"] == selected_country][[country_col, year_col, pm25_col]].dropna()
 
     if df_pm.empty:
-        st.info("No PM2.5 data available for this country in `pm25-air-pollution.csv`.")
+        st.info("No PM2.5 data available for this country.")
     else:
-        latest_row = df_pm.iloc[-1]
-        latest_year = int(latest_row[pm_year_col])
-        latest_val = float(latest_row[pm_value_col])
-        st.metric(f"Latest PM2.5 (μg/m³) – {latest_year}", f"{latest_val:.1f}")
+        df_pm = df_pm.sort_values(year_col)
 
-        # Simple linear trend (hybrid upgrade: “is PM2.5 rising or falling?”)
+        latest_year = df_pm[year_col].iloc[-1]
+        latest_val = df_pm[pm25_col].iloc[-1]
+
+        st.metric(f"Latest PM2.5 (μg/m³) — {latest_year}", f"{latest_val:.1f}")
+
+        # Trend detection (linear fit)
         if len(df_pm) >= 2:
-            years = df_pm[pm_year_col].to_numpy()
-            vals = df_pm[pm_value_col].to_numpy()
+            years = df_pm[year_col].to_numpy()
+            vals = df_pm[pm25_col].to_numpy()
             slope, intercept = np.polyfit(years, vals, 1)
-            trend = "increasing" if slope > 0 else "decreasing"
+            trend = "increasing 📈" if slope > 0 else "decreasing 📉"
             st.caption(f"Trend analysis: PM2.5 levels are **{trend}** over the recorded period.")
         else:
-            st.caption("Not enough historical points to estimate a trend.")
+            st.caption("Not enough data points to calculate trend.")
 
-        fig_pm = px.line(
+        fig2 = px.line(
             df_pm,
-            x=pm_year_col,
-            y=pm_value_col,
+            x=year_col,
+            y=pm25_col,
             markers=True,
-            labels={pm_year_col: "Year", pm_value_col: "PM2.5 (μg/m³)"},
-            title="PM2.5 trend (historical exposure)",
-            color_discrete_sequence=["#2563eb"],
+            title="Historical PM2.5 Levels",
+            labels={year_col: "Year", pm25_col: "PM2.5 (μg/m³)"},
+            color_discrete_sequence=["#2563eb"]
         )
-        fig_pm.update_layout(
-            height=350,
-            margin=dict(l=0, r=0, t=45, b=0),
-            paper_bgcolor="rgba(0,0,0,0)",
-            plot_bgcolor="rgba(0,0,0,0)",
-        )
-        st.plotly_chart(fig_pm, use_container_width=True)
+        fig2.update_layout(height=340, margin=dict(l=0, r=0, t=50, b=0))
+        st.plotly_chart(fig2, use_container_width=True)
 
-        with st.expander("Show PM2.5 data table"):
-            st.dataframe(df_pm[[pm_country_col, pm_year_col, pm_value_col]])
+        with st.expander("Show full PM2.5 dataset for this country"):
+            st.dataframe(df_pm)
+
     st.markdown("</div>", unsafe_allow_html=True)
 
