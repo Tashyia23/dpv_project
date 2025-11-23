@@ -3,14 +3,16 @@
 import streamlit as st
 import pandas as pd
 import plotly.express as px
-
+from utils.loader import load_master_data
 from utils.loader import load_base_data
 from utils.ui import header
 from utils.regions import REGION_COLORS
 
 st.set_page_config(layout="wide")
 
-df = load_base_data()
+# df = load_base_data()
+df = load_master_data()
+
 
 header(
     "🌎 Regional Explorer",
