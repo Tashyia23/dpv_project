@@ -338,29 +338,7 @@ display_df = agg_df.sort_values(metric_col, ascending=False).head(top_n)
 
 title = f"Top {top_n} Countries ({metric_label})"
 
-# -----------------------------------------
-# PLOT — Clean bar chart for pollutant ranking
-# -----------------------------------------
-fig = px.bar(
-    display_df,
-    x="country", y=metric_col,
-    title=title,
-    color="risk_level",
-    color_discrete_map={
-        "Low": "#22c55e",
-        "Moderate": "#eab308",
-        "High": "#f97316",
-        "Very High": "#ef4444",
-    }
-)
 
-fig.update_traces(text=None, hovertemplate="<b>%{x}</b><br>Value: %{y:.2f}")
-fig.update_layout(height=450, margin=dict(l=0, r=0, t=40, b=0))
-
-st.plotly_chart(fig, use_container_width=True)
-
-with st.expander("Show full table"):
-    st.dataframe(display_df)
 
 
 st.markdown("<div class='chart-card'>", unsafe_allow_html=True)
