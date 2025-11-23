@@ -8,14 +8,14 @@ from utils.ui import header
 st.set_page_config(layout="wide")
 
 # ---------------------------------------------------
-# Mini horizontal bar chart 
+# Mini horizontal bar chart  (FIXED – returns only rows)
 # ---------------------------------------------------
 def mini_bar_chart(values, labels, max_width=160, height=8, colors=None):
     if colors is None:
         colors = ["#7C3AED", "#0EA5E9", "#F59E0B", "#EF4444", "#10B981"]
 
-    html = "<div>"
     max_val = max(values) if max(values) else 1
+    html = ""
 
     for i, v in enumerate(values):
         width = int((v / max_val) * max_width)
@@ -31,9 +31,7 @@ def mini_bar_chart(values, labels, max_width=160, height=8, colors=None):
             "</div>"
         )
 
-    html += "</div>"
-    return html
-
+    return html   # <- FIXED (no outer <div> wrapper)
 
 
 # ---------------------------------------------------
@@ -66,7 +64,6 @@ pollutant_info = {
 }
 
 pollutant_options = [c for c in df.columns if c.endswith("_aqi_value")]
-
 pretty_labels = {c: f"{pollutant_info[c][0]} {pollutant_info[c][1]}" for c in pollutant_options}
 
 selected_pollutants = st.multiselect(
@@ -127,7 +124,6 @@ else:
         w = st.slider(f"Weight for {pretty_labels[col]}", 0.0, 10.0, 1.0, 0.1)
         weights[col] = w
         total_w += w
-
     norm_weights = equal_weights if total_w == 0 else {c: weights[c] / total_w for c in selected_pollutants}
 
 st.markdown("</div>", unsafe_allow_html=True)
@@ -149,7 +145,6 @@ scaled_df = pd.DataFrame(scaled)
 agg_df["risk_index"] = sum(scaled_df[c] * norm_weights[c] for c in selected_pollutants)
 
 q1, q2, q3 = np.percentile(agg_df["risk_index"], [25, 50, 75])
-
 def classify(r):
     if r <= q1: return "Low"
     if r <= q2: return "Moderate"
@@ -162,7 +157,6 @@ agg_df["risk_level"] = agg_df["risk_index"].apply(classify)
 # ---------------------------------------------------
 # 3. KPI Overview
 # ---------------------------------------------------
-
 st.markdown("<div class='chart-card'>", unsafe_allow_html=True)
 st.markdown("### 🌍 Global Pollution Risk Overview")
 
@@ -176,7 +170,7 @@ best_vals = [float(best_row[c]) for c in selected_pollutants]
 
 c1, c2, c3 = st.columns(3)
 
-# ---------------- Global Card ----------------
+# --- Global Card ---
 c1.markdown(
     f"""
     <div class="kpi-card" style="height:100%;">
@@ -188,44 +182,43 @@ c1.markdown(
     unsafe_allow_html=True
 )
 
+# --- Highest Risk (FIXED) ---
+c2.markdown(
+    f"""
+    <div class="kpi-card">
+        <div class="kpi-label">Highest Risk Country</div>
+        <div class="kpi-value">{worst_row['country']}</div>
+        <div class="kpi-sub">Index {worst_row['risk_index']:.2f} ({worst_row['risk_level']})</div>
 
-# ---------------- Highest Risk Card - FULLY WRAPPED ----------------
-worst_html = f"""
-<div class="kpi-card">
-    <div class="kpi-label">Highest Risk Country</div>
-    <div class="kpi-value">{worst_row['country']}</div>
-    <div class="kpi-sub">Index {worst_row['risk_index']:.2f} ({worst_row['risk_level']})</div>
+        <div class="kpi-sub" style="margin-top:8px;">Pollutant Breakdown</div>
 
-    <div class="kpi-sub" style="margin-top:8px;">Pollutant Breakdown</div>
-
-    <div style="margin-top:12px;">
-        {mini_bar_chart(worst_vals, labels)}
+        <div style="margin-top:12px;">
+            {mini_bar_chart(worst_vals, labels)}
+        </div>
     </div>
-</div>
-"""
+    """,
+    unsafe_allow_html=True
+)
 
-c2.markdown(worst_html, unsafe_allow_html=True)
+# --- Lowest Risk (FIXED) ---
+c3.markdown(
+    f"""
+    <div class="kpi-card">
+        <div class="kpi-label">Lowest Risk Country</div>
+        <div class="kpi-value">{best_row['country']}</div>
+        <div class="kpi-sub">Index {best_row['risk_index']:.2f} ({best_row['risk_level']})</div>
 
+        <div class="kpi-sub" style="margin-top:8px;">Pollutant Breakdown</div>
 
-# ---------------- Lowest Risk Card - FULLY WRAPPED ----------------
-best_html = f"""
-<div class="kpi-card">
-    <div class="kpi-label">Lowest Risk Country</div>
-    <div class="kpi-value">{best_row['country']}</div>
-    <div class="kpi-sub">Index {best_row['risk_index']:.2f} ({best_row['risk_level']})</div>
-
-    <div class="kpi-sub" style="margin-top:8px;">Pollutant Breakdown</div>
-
-    <div style="margin-top:12px;">
-        {mini_bar_chart(best_vals, labels)}
+        <div style="margin-top:12px;">
+            {mini_bar_chart(best_vals, labels)}
+        </div>
     </div>
-</div>
-"""
-
-c3.markdown(best_html, unsafe_allow_html=True)
+    """,
+    unsafe_allow_html=True
+)
 
 st.markdown("</div>", unsafe_allow_html=True)
-
 
 
 # ---------------------------------------------------
