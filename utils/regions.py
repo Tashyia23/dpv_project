@@ -82,56 +82,76 @@
 
 
 #_____________________________
+# utils/regions.py
+
 import pycountry
-from rapidfuzz import fuzz, process
+from rapidfuzz import process
 
-# -------------------------
-# UN M49 Region Mapping
-# -------------------------
-UN_REGION_MAP = {
-    "Africa": ["AF", "011", "012", "013", "014", "017", "018"],
-    "Asia": ["AS", "030", "034", "035", "143", "145"],
-    "Europe": ["EU", "039", "151", "154", "155"],
-    "North America": ["019", "021", "013"],       # includes Caribbean + Central America
-    "South America": ["005"],
-    "Oceania": ["009", "053", "054", "057", "061"],
-}
+# --------------------------------
+# 1. Region lookup using pycountry
+# --------------------------------
+def get_country_region(country_name: str) -> str:
+    """
+    Attempts to detect a country's region automatically:
+    - Handles alternate spellings
+    - Handles abbreviations
+    - Uses fuzzy matching for inconsistent names
+    """
 
-def get_region_from_un_m49(country_name: str):
+    if not isinstance(country_name, str) or country_name.strip() == "":
+        return "Other"
+
+    # Try exact match first
     try:
-        result = pycountry.countries.search_fuzzy(country_name)[0]
-        country_alpha2 = result.alpha_2
-        country_numeric = result.numeric
+        country = pycountry.countries.lookup(country_name)
+    except LookupError:
+        country = None
+
+    # If lookup fails → fuzzy match from pycountry list
+    if country is None:
+        names = [c.name for c in pycountry.countries]
+        match, score, _ = process.extractOne(country_name, names)
+
+        if score >= 85:  # strong match threshold
+            country = pycountry.countries.get(name=match)
+
+    if country is None:
+        return "Other"
+
+    # Now detect region via pycountry subdivisions
+    try:
+        # Some countries have a single default subdivision listing region
+        subdivisions = list(pycountry.subdivisions.get(country_code=country.alpha_2))
+        if subdivisions:
+            region = subdivisions[0].type
+            if region in ["Asia", "Europe", "Africa", "Americas", "Oceania"]:
+                return region
     except Exception:
-        return "Other"
+        pass
 
-    # Match via numeric region codes
-    for region, codes in UN_REGION_MAP.items():
-        if country_numeric in codes:
-            return region
+    # Manual continent mapping fallback
+    continent_map = {
+        "AF": "Africa",
+        "AS": "Asia",
+        "EU": "Europe",
+        "NA": "North America",
+        "SA": "South America",
+        "OC": "Oceania",
+    }
 
-    # If not found directly — fallback
-    return "Other"
+    country_continent = getattr(country, "region", None)
+
+    # If pycountry detected region internally (depends on dataset)
+    if country_continent in continent_map.values():
+        return country_continent
+
+    # Alpha-2 to continent fallback
+    return continent_map.get(getattr(country, "alpha_2", ""), "Other")
 
 
-# -------------------------
-# Fuzzy Matching Wrapper
-# -------------------------
-def assign_region(country_name: str):
-    if not isinstance(country_name, str) or not country_name.strip():
-        return "Other"
+# Public function for Streamlit use
+def assign_region(name: str) -> str:
+    return get_country_region(name)
 
-    # Try direct UN region lookup
-    region = get_region_from_un_m49(country_name)
-    if region != "Other":
-        return region
 
-    # Fuzzy rescue for odd names (e.g. "United States", "Viet Nam")
-    all_countries = [c.name for c in pycountry.countries]
-    best, score, _ = process.extractOne(country_name, all_countries, scorer=fuzz.WRatio)
-
-    if score > 85:  # Strong match
-        return get_region_from_un_m49(best)
-
-    return "Other"
 
