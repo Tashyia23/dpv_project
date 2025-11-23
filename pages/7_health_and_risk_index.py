@@ -42,7 +42,7 @@ def mini_bar_chart(values, labels, max_width=220, height=10, colors=None):
     if colors is None:
         colors = ["#8B5CF6", "#0EA5E9", "#F59E0B", "#EF4444", "#10B981"]
 
-    html = "<div style='margin-top:5px;'>"
+    html = "<div style='margin-top:10px;'>"
     max_val = max(values) if max(values) else 1
 
     for i, v in enumerate(values):
@@ -50,18 +50,20 @@ def mini_bar_chart(values, labels, max_width=220, height=10, colors=None):
         color = colors[i % len(colors)]
 
         html += f"""
-        <div style='margin-bottom:10px;'>
-            <div style='font-size:0.80rem;color:#374151;font-weight:500;margin-bottom:2px;'>{labels[i]}</div>
+        <div style='margin-bottom:14px;'>
+            <div style='font-size:0.85rem;color:#374151;font-weight:600;margin-bottom:4px;'>{labels[i]}</div>
 
             <div style='background:#E5E7EB;border-radius:6px;height:{height}px;width:{max_width}px;'>
                 <div style='background:{color};width:{width}px;height:{height}px;border-radius:6px;'></div>
             </div>
 
-            <div style='font-size:0.75rem;color:#4B5563;margin-top:2px;text-align:right;width:{max_width}px;'>{v:.2f}</div>
+            <div style='font-size:0.75rem;color:#4B5563;margin-top:3px;text-align:right;width:{max_width}px;'>{v:.2f}</div>
         </div>
         """
+
     html += "</div>"
     return html
+
 
 
 
