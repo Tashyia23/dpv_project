@@ -1,6 +1,8 @@
 import streamlit as st
 from utils.loader import load_base_data, load_pm25_data
 from utils.ui import header
+from utils.merged_datasets import load_master_dataset
+
 
 st.set_page_config(
     page_title="Global Air Pollution Dashboard",
