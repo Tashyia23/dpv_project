@@ -8,6 +8,40 @@ import plotly.graph_objects as go
 import base64
 import io
 
+# ---------------------------------------------------
+# Lightweight SVG Sparkline (Streamlit-safe)
+# ---------------------------------------------------
+def svg_sparkline(values, width=140, height=32, color="#4F46E5"):
+    values = list(values)
+    if len(values) == 0:
+        return ""
+
+    min_v = min(values)
+    max_v = max(values)
+    span = max_v - min_v if max_v != min_v else 1
+
+    # Normalize values to SVG height
+    points = []
+    for i, v in enumerate(values):
+        x = (i / (len(values) - 1)) * width
+        y = height - ((v - min_v) / span) * height
+        points.append((x, y))
+
+    # Build SVG <path>
+    path = "M " + " L ".join(f"{x:.2f} {y:.2f}" for x, y in points)
+
+    svg = f"""
+    <svg width="{width}" height="{height}" xmlns="http://www.w3.org/2000/svg">
+        <polyline points="{' '.join(f'{x:.2f},{y:.2f}' for x,y in points)}"
+                  fill="none"
+                  stroke="{color}"
+                  stroke-width="2"
+                  stroke-linecap="round"
+        />
+    </svg>
+    """
+    return svg
+
 st.set_page_config(layout="wide")
 
 # ---------------------------------------------------
@@ -191,130 +225,69 @@ agg_df["risk_level"] = agg_df["risk_index"].apply(classify_risk)
 # 3. Global risk overview
 # ---------------------------------------------------
 
+# ---------------------------------------------------
+# 2. Global Risk Overview (Improved KPIs)
+# ---------------------------------------------------
 st.markdown("<div class='chart-card'>", unsafe_allow_html=True)
-
-st.markdown("""
-<div style='font-size: 22px; font-weight: 800; margin-bottom: 12px;'>
-    🌍 Global Pollution Risk Overview
-</div>
-""", unsafe_allow_html=True)
-
-# Helper — convert country name to emoji flag
-def country_to_flag(country):
-    try:
-        return ''.join(chr(127397 + ord(c.upper())) for c in country if c.isalpha())
-    except:
-        return "🏳"
+st.markdown("### 🌍 Global Pollution Risk Overview")
 
 avg_risk = agg_df["risk_index"].mean()
 worst_row = agg_df.loc[agg_df["risk_index"].idxmax()]
 best_row = agg_df.loc[agg_df["risk_index"].idxmin()]
 
-# Create sparkline helper
+# Generate sparkline inputs
+global_vals = agg_df["risk_index"].values
+worst_vals = worst_row[selected_pollutants].values
+best_vals = best_row[selected_pollutants].values
 
-def sparkline(values):
-    fig = go.Figure()
-    fig.add_trace(go.Scatter(
-        y=values,
-        mode="lines",
-        line=dict(width=2, color="#1f77b4"),
-        hoverinfo="skip"
-    ))
+# Convert to SVG
+global_svg = svg_sparkline(global_vals, color="#0EA5E9")
+worst_svg = svg_sparkline(worst_vals, color="#EF4444")
+best_svg = svg_sparkline(best_vals, color="#22C55E")
 
-    fig.update_layout(
-        xaxis=dict(visible=False),
-        yaxis=dict(visible=False),
-        paper_bgcolor="rgba(0,0,0,0)",
-        plot_bgcolor="rgba(0,0,0,0)",
-        margin=dict(l=0, r=0, t=0, b=0),
-        height=40,
-        width=180,
+# KPI layout
+c1, c2, c3 = st.columns(3)
+
+with c1:
+    st.markdown(
+        f"""
+        <div class="kpi-card">
+            <div class="kpi-label">Global Average Risk</div>
+            <div class="kpi-value">{avg_risk:.2f}</div>
+            <div class="kpi-sub">Scaled index (0–1)</div>
+            <div>{global_svg}</div>
+        </div>
+        """,
+        unsafe_allow_html=True,
     )
 
-    # Export Plotly figure as PNG then convert to base64
-    buffer = io.BytesIO()
-    fig.write_image(buffer, format="png", scale=3)
-    buffer.seek(0)
-    return base64.b64encode(buffer.read()).decode()
-# Generate mini sparkline for top/bottom country
-worst_spark = sparkline(worst_row[selected_pollutants].values)
-best_spark = sparkline(best_row[selected_pollutants].values)
-
-kpi1, kpi2, kpi3 = st.columns(3)
-
-# ==========================
-# GLOBAL AVERAGE CARD
-# ==========================
-with kpi1:
-    st.markdown(f"""
-    <div class="kpi-card" style="
-        text-align: center;
-        background: linear-gradient(135deg, #dbeafe, #bfdbfe);
-        border-left: 6px solid #3b82f6;
-    ">
-        <div class="kpi-label">🌐 Global Average Risk</div>
-        <div class="kpi-value" style="font-size: 1.7rem;">{avg_risk:.2f}</div>
-        <div class="kpi-sub">Scaled index (0–1)</div>
-    </div>
-    """, unsafe_allow_html=True)
-
-# ==========================
-# HIGHEST RISK CARD
-# ==========================
-with kpi2:
-    flag = country_to_flag(worst_row["country"])
-    st.markdown(f"""
-    <div class="kpi-card" style="
-        background: linear-gradient(135deg, #fecaca, #fca5a5);
-        border-left: 6px solid #ef4444;
-    ">
-        <div class="kpi-label">🔥 Highest Risk Country</div>
-        <div class="kpi-value" style="font-size: 1.2rem;">
-            {flag} {worst_row['country']}
+with c2:
+    st.markdown(
+        f"""
+        <div class="kpi-card">
+            <div class="kpi-label">Highest Risk Country</div>
+            <div class="kpi-value">{worst_row['country']}</div>
+            <div class="kpi-sub">Index {worst_row['risk_index']:.2f} ({worst_row['risk_level']})</div>
+            <div>{worst_svg}</div>
         </div>
-        <div class="kpi-sub">
-            Index {worst_row['risk_index']:.2f} ({worst_row['risk_level']})
-        </div>
+        """,
+        unsafe_allow_html=True,
+    )
 
-        <div style="margin-top: 8px; font-size: 0.7rem; color: #7f1d1d;">
-            <strong>Top ranked (#1)</strong> · Highest combined pollutant burden
+with c3:
+    st.markdown(
+        f"""
+        <div class="kpi-card">
+            <div class="kpi-label">Lowest Risk Country</div>
+            <div class="kpi-value">{best_row['country']}</div>
+            <div class="kpi-sub">Index {best_row['risk_index']:.2f} ({best_row['risk_level']})</div>
+            <div>{best_svg}</div>
         </div>
-
-        <img src="data:image/png;base64,{worst_spark}" 
-             style="width:100%; margin-top:6px;" />
-    </div>
-    """, unsafe_allow_html=True)
-
-# ==========================
-# LOWEST RISK CARD
-# ==========================
-with kpi3:
-    flag = country_to_flag(best_row["country"])
-    st.markdown(f"""
-    <div class="kpi-card" style="
-        background: linear-gradient(135deg, #bbf7d0, #86efac);
-        border-left: 6px solid #22c55e;
-    ">
-        <div class="kpi-label">🍃 Lowest Risk Country</div>
-        <div class="kpi-value" style="font-size: 1.2rem;">
-            {flag} {best_row['country']}
-        </div>
-        <div class="kpi-sub">
-            Index {best_row['risk_index']:.2f} ({best_row['risk_level']})
-        </div>
-
-        <div style="margin-top: 8px; font-size: 0.7rem; color: #065f46;">
-            <strong>#1 Cleanest</strong> · Lowest combined pollutant exposure
-        </div>
-
-        <img src="data:image/png;base64,{best_spark}" 
-             style="width:100%; margin-top:6px;" />
-    </div>
-    """, unsafe_allow_html=True)
+        """,
+        unsafe_allow_html=True,
+    )
 
 st.markdown("</div>", unsafe_allow_html=True)
-
-
 
 # ---------------------------------------------------
 # 4. Bar chart
