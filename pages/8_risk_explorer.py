@@ -67,6 +67,97 @@ if view_mode.startswith("Before"):
     fig_raw.update_layout(height=450, xaxis_tickangle=45)
     st.plotly_chart(fig_raw, use_container_width=True)
 
+    #_______
+    # =====================================================================
+# BEFORE PROCESSING — ADVANCED RAW VISUALISATIONS
+# =====================================================================
+
+st.subheader("🌫 Raw Pollutant Levels (Before Processing)")
+
+pollutant_raw = st.selectbox("Select pollutant:", pollutants)
+
+raw_plot_df = raw_agg.sort_values(pollutant_raw, ascending=False).head(25)
+
+fig_raw = px.bar(
+    raw_plot_df,
+    x="country",
+    y=pollutant_raw,
+    title=f"Top 25 Countries — Raw {pollutant_raw}",
+    labels={pollutant_raw: "AQI (Raw)"}
+)
+fig_raw.update_layout(height=450)
+st.plotly_chart(fig_raw, use_container_width=True)
+
+st.markdown("---")
+st.subheader("📊 1. Distribution Plot (Histogram)")
+
+fig_hist = px.histogram(
+    df,
+    x=pollutant_raw,
+    nbins=40,
+    title=f"Distribution of Raw {pollutant_raw}",
+    color_discrete_sequence=["#6366f1"]
+)
+fig_hist.update_layout(height=400)
+st.plotly_chart(fig_hist, use_container_width=True)
+
+st.markdown("---")
+st.subheader("🔥 2. Correlation Heatmap (Raw Pollutants)")
+
+corr = df[pollutants].corr()
+
+fig_corr = px.imshow(
+    corr,
+    text_auto=True,
+    aspect="auto",
+    title="Correlation Matrix — Raw AQI Pollutants",
+    color_continuous_scale="RdBu_r",
+)
+fig_corr.update_layout(height=450)
+st.plotly_chart(fig_corr, use_container_width=True)
+
+st.markdown("---")
+st.subheader("🌍 3. Raw Choropleth Map")
+
+raw_map_df = raw_agg.copy()
+
+fig_map = px.choropleth(
+    raw_map_df,
+    locations="country",
+    locationmode="country names",
+    color=pollutant_raw,
+    title=f"Global Map — Raw {pollutant_raw}",
+    color_continuous_scale="RdYlBu_r"
+)
+fig_map.update_geos(showframe=False, projection_type="natural earth")
+fig_map.update_layout(height=450)
+st.plotly_chart(fig_map, use_container_width=True)
+
+st.markdown("---")
+st.subheader("🗺 4. Regional Boxplot (Raw AQI Variation)")
+
+fig_box = px.box(
+    df,
+    x="region",
+    y=pollutant_raw,
+    title=f"{pollutant_raw} Distribution by Region (Before Processing)",
+    color="region"
+)
+fig_box.update_layout(height=450)
+st.plotly_chart(fig_box, use_container_width=True)
+
+# Final Info Message
+st.info(
+    "You are currently viewing **raw AQI data** before cleaning, merging, or normalization.\n\n"
+    "Switch to **After Processing** to explore composite risk index, WHO scoring, heatmaps, radar charts, and full analytics."
+)
+
+st.stop()
+
+
+
+    #______
+
     st.info(
         "You are currently viewing **raw AQI data before any cleaning**.\n\n"
         "Switch to *After Processing* to explore the fully normalised risk index and advanced analytics."
