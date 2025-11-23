@@ -21,39 +21,54 @@ if "country" not in df.columns:
     st.error("The base dataset is missing a 'country' column.")
     st.stop()
 
-# ---------------------------------------------------
-# 1. Choose pollutants and build a risk score
-# ---------------------------------------------------
 # -----------------------------------------------------------
-# 1. Configure Risk Score (Improved UI)
+# 1. Configure Risk Score 
 # -----------------------------------------------------------
+# -----------------------------------------------------------
+# 1. Configure Risk Score (Upgraded: WHO/EPA presets + icons)
+# -----------------------------------------------------------
+
 st.markdown("<div class='chart-card'>", unsafe_allow_html=True)
 st.markdown("### 1. Configure Risk Score")
 
 st.markdown(
     """
-    Select which pollutants should contribute to the **Health & Pollution Risk Index**.  
-    By default, each pollutant is **equally weighted** so users do not need to tune anything.
+    Select pollutants for the **Pollution Health Risk Index**.
+    By default, all pollutants are equally weighted (Simple Mode).
 
-    If needed, enable **Advanced Mode** to customise individual pollutant weights.
+    Use **WHO/EPA presets** for health-science based scoring,  
+    or enable **Advanced Mode** for full control.
     """
 )
 
-# Detect AQI pollutant columns
-pollutant_options = [
-    col for col in df.columns 
-    if col.endswith("_aqi_value") and col != "aqi_value"
-]
+# -----------------------------------------------------------
+# Pollutant icons + descriptions for tooltips
+# -----------------------------------------------------------
+pollutant_info = {
+    "pm25_aqi_value": ("🟤 PM2.5", "Fine particles linked to cardiovascular and lung diseases."),
+    "pm10_aqi_value": ("🟠 PM10", "Coarse particles affecting upper respiratory tract."),
+    "no2_aqi_value": ("💛 NO₂", "Nitrogen dioxide – asthma triggers & respiratory inflammation."),
+    "ozone_aqi_value": ("💜 O₃", "Ground-level ozone – lung irritation, breathing difficulty."),
+    "co_aqi_value": ("❤️ CO", "Carbon monoxide – reduces oxygen delivery to organs."),
+}
+
+pollutant_options = [c for c in df.columns if c.endswith("_aqi_value")]
 
 if not pollutant_options:
-    st.error("No pollutant AQI columns found in the dataset.")
+    st.error("No pollutant AQI columns found.")
     st.stop()
 
-# Simple pollutant multi-selector
+# Pretty labels with icons
+pretty_labels = {
+    col: f"{pollutant_info[col][0]} {col.replace('_aqi_value', '').upper()}"
+    for col in pollutant_options if col in pollutant_info
+}
+
 selected_pollutants = st.multiselect(
-    "Pollutants to include in the risk index",
+    "Pollutants to include",
     pollutant_options,
-    default=pollutant_options,  # Select all by default
+    default=pollutant_options,
+    format_func=lambda x: pretty_labels.get(x, x),
 )
 
 if not selected_pollutants:
@@ -61,17 +76,56 @@ if not selected_pollutants:
     st.stop()
 
 # -----------------------------------------------------------
-# Advanced mode toggle
+# Preset profiles (Beginner / WHO / EPA / Expert)
 # -----------------------------------------------------------
-advanced_mode = st.toggle("🔧 Enable Advanced Mode (custom weights)", value=False)
+st.markdown("#### 🔧 Select a preset (optional)")
 
-if advanced_mode:
+preset = st.radio(
+    "",
+    ["Beginner Mode (equal weights)", "WHO Health Severity", "EPA Danger Scale", "Expert Mode"],
+)
+
+# Default equal weights
+equal_weights = {c: 1 / len(selected_pollutants) for c in selected_pollutants}
+
+# WHO-based severity (scientific justification)
+# Higher weight → more harmful to human health
+who_weights = {
+    "pm25_aqi_value": 0.40,
+    "no2_aqi_value": 0.25,
+    "ozone_aqi_value": 0.20,
+    "pm10_aqi_value": 0.10,
+    "co_aqi_value": 0.05,
+}
+
+# EPA-based danger classification
+epa_weights = {
+    "pm25_aqi_value": 0.35,
+    "pm10_aqi_value": 0.20,
+    "no2_aqi_value": 0.20,
+    "ozone_aqi_value": 0.15,
+    "co_aqi_value": 0.10,
+}
+
+# Override weights based on preset
+if preset == "Beginner Mode (equal weights)":
+    norm_weights = equal_weights
+
+elif preset == "WHO Health Severity":
+    # Only include selected pollutants
+    total = sum(who_weights.get(c, 0) for c in selected_pollutants)
+    norm_weights = {c: who_weights[c] / total for c in selected_pollutants}
+
+elif preset == "EPA Danger Scale":
+    total = sum(epa_weights.get(c, 0) for c in selected_pollutants)
+    norm_weights = {c: epa_weights[c] / total for c in selected_pollutants}
+
+else:
+    # Expert mode → show advanced slider weights
+    advanced_mode = True
+    st.markdown("#### ⚙ Expert Mode – Fine-tune pollutant weighting")
     st.caption(
-        """
-        **Advanced Mode:**  
-        Adjust individual pollutant weights below.  
-        Weights will be **normalised automatically** so they add up to 1.
-        """
+        "Adjust weights manually. Weights are normalised automatically."
     )
 
     weights = {}
@@ -79,34 +133,33 @@ if advanced_mode:
 
     for col in selected_pollutants:
         w = st.slider(
-            f"Weight for {col}",
+            f"Weight for {pretty_labels[col]}",
             min_value=0.0,
             max_value=10.0,
             value=1.0,
             step=0.1,
-            key=f"weight_{col}",
+            key=f"w_{col}",
         )
         weights[col] = w
         total_weight += w
 
-    # Normalise weights
     if total_weight == 0:
-        norm_weights = {c: 1 / len(selected_pollutants) for c in selected_pollutants}
+        norm_weights = equal_weights
     else:
         norm_weights = {c: w / total_weight for c, w in weights.items()}
 
-else:
-    # SIMPLE MODE → Equal weights
+# Simple modes don’t show sliders
+if preset != "Expert Mode":
     st.caption(
         """
-        **Simple Mode:**  
-        All pollutants are equally weighted to avoid bias and keep interpretation easy.
+        **Note:**  
+        - Beginner Mode → all pollutants contribute equally  
+        - WHO Mode → prioritises health-harm severity  
+        - EPA Mode → prioritises regulatory danger  
         """
     )
-    norm_weights = {c: 1 / len(selected_pollutants) for c in selected_pollutants}
 
 st.markdown("</div>", unsafe_allow_html=True)
-
 
 # ---------------------------------------------------
 # 2. Compute country-level risk index
