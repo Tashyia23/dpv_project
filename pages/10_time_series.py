@@ -490,6 +490,8 @@
 #_____________________________________________-
 
 from utils.data_loader import load_processed_dataset
+import streamlit as st
+
 
 processed_df = load_processed_dataset()
 
