@@ -1,71 +1,83 @@
+# pages/3_🏙_Country_Pollutants.py
 import streamlit as st
 import plotly.express as px
 from utils.loader import load_base_data
 from utils.ui import header
 
 st.set_page_config(layout="wide")
-
 base_df = load_base_data()
 
 header(
     "🏙 Country Pollutant Breakdown",
-    "Compare pollutant-specific AQI averages across selected countries."
+    "Compare pollutant-specific AQI levels across multiple countries."
 )
 
 if "country" not in base_df.columns:
-    st.error("Dataset does not contain a 'country' column.")
+    st.error("Column 'country' is missing in the dataset.")
     st.stop()
 
-# ------------------ Country selection ------------------
 countries = sorted(base_df["country"].dropna().unique().tolist())
-default_selection = countries[:3] if len(countries) >= 3 else countries
+default_countries = countries[:3] if len(countries) >= 3 else countries
 
 selected_countries = st.multiselect(
-    "Select countries:",
+    "Choose countries to compare",
     countries,
-    default=default_selection
+    default=default_countries,
+    key="country_multi",
 )
 
 if not selected_countries:
-    st.info("Select at least one country to compare.")
+    st.info("Select at least one country to view the comparison.")
     st.stop()
 
 df_c = base_df[base_df["country"].isin(selected_countries)]
 
-# ------------------ Pollutant columns ------------------
 pollutant_cols = [
     c for c in base_df.columns if c.endswith("_aqi_value") and c != "aqi_value"
 ]
-
 if not pollutant_cols:
-    st.warning("No pollutant-specific AQI columns found.")
+    st.warning("No pollutant-specific AQI columns found in the dataset.")
     st.stop()
 
-# ------------------ Aggregate ------------------
 avg_pollutants = df_c.groupby("country")[pollutant_cols].mean().reset_index()
 
 long_df = avg_pollutants.melt(
     id_vars="country",
+    value_vars=pollutant_cols,
     var_name="pollutant",
     value_name="aqi_value",
 )
+long_df["pollutant"] = (
+    long_df["pollutant"].str.replace("_aqi_value", "", regex=False).str.upper()
+)
 
-long_df["pollutant"] = long_df["pollutant"].str.replace("_aqi_value", "").str.upper()
+chart_type = st.selectbox(
+    "Chart style",
+    ["Grouped bar", "Stacked bar"],
+    index=0,
+)
 
-# ------------------ Plot ------------------
-fig = px.bar(
+st.markdown("<div class='chart-card'>", unsafe_allow_html=True)
+barmode = "group" if chart_type == "Grouped bar" else "stack"
+fig_bar = px.bar(
     long_df,
     x="country",
     y="aqi_value",
     color="pollutant",
-    barmode="group",
-    color_discrete_sequence=px.colors.qualitative.Set2,
+    barmode=barmode,
     labels={"aqi_value": "Average AQI"},
-    title="Average Pollutant Levels by Country",
+    title="Average pollutant AQI levels by country",
+    color_discrete_sequence=px.colors.qualitative.Set2,
 )
-
-fig.update_layout(height=500)
-st.plotly_chart(fig, use_container_width=True)
+fig_bar.update_layout(
+    height=460,
+    margin=dict(l=0, r=0, t=40, b=0),
+    paper_bgcolor="rgba(0,0,0,0)",
+    plot_bgcolor="rgba(0,0,0,0)",
+)
+st.plotly_chart(fig_bar, use_container_width=True)
+st.markdown("</div>", unsafe_allow_html=True)
 
 with st.expander("Show underlying values"):
     st.dataframe(long_df)
+
