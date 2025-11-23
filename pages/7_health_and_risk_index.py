@@ -298,10 +298,6 @@ else:
 # 6. Risk Ranking
 # ====================================================================================
 
-# ---------------------------------------------------
-# 4. Advanced Country Ranking (Pollutant Filter + Flags)
-# ---------------------------------------------------
-
 st.markdown("<div class='chart-card'>", unsafe_allow_html=True)
 st.markdown("### 3. Country Risk Ranking")
 
@@ -342,59 +338,7 @@ pollutant_titles = {
 
 title = f"Top {top_n} Countries ({ranking_type} {pollutant_titles[ranking_metric]})"
 
-# --- Country Flag Helper ---
-def flag_img(country_name):
-    iso_map = {
-        "Republic of Korea": "KR",
-        "Kuwait": "KW",
-        "Bahrain": "BH",
-        "Qatar": "QA",
-        "United Arab Emirates": "AE",
-        "Pakistan": "PK",
-        "China": "CN",
-        "Oman": "OM",
-        "Saudi Arabia": "SA",
-        "Nepal": "NP",
-        "Palau": "PW"
-        # Add more if needed
-    }
-
-    code = iso_map.get(country_name, None)
-    if code:
-        return f"<img src='https://flagsapi.com/{code}/flat/32.png' width='26' style='border-radius:4px;'>"
-    return "🏳"
-
-subset_df["flag"] = subset_df["country"].apply(flag_img)
-
-# --- Plot with Flags ---
-fig = px.bar(
-    subset_df,
-    x="country",
-    y=ranking_metric,
-    text="flag",
-    color="risk_level" if ranking_metric == "risk_index" else None,
-    title=title,
-)
-
-fig.update_traces(textposition="inside", insidetextanchor="start")
-
-fig.update_layout(
-    height=500,
-    margin=dict(l=0, r=0, t=40, b=0),
-)
-
-st.plotly_chart(fig, use_container_width=True)
-
-# --- Show full table with flags ---
-st.dataframe(
-    subset_df[["flag", "country", ranking_metric, "risk_level"]],
-    use_container_width=True
-)
-
 st.markdown("</div>", unsafe_allow_html=True)
-
-
-
 
 # ====================================================================================
 # 7. Interpretation
