@@ -1,11 +1,14 @@
 # pages/6_📈_PM25_Trends.py
 import streamlit as st
 import plotly.express as px
+from utils.loader import load_master_data
 from utils.loader import load_pm25_data
 from utils.ui import header
 
 st.set_page_config(layout="wide")
-pm25_df = load_pm25_data()
+#pm25_df = load_pm25_data()
+df = load_master_data()
+
 
 header(
     "📈 PM2.5 Trends",
