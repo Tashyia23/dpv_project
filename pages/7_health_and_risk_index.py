@@ -213,16 +213,34 @@ labels = [pollutant_info[c][1] for c in selected_pollutants]
 worst_vals = [float(worst_row[c]) for c in selected_pollutants]
 best_vals = [float(best_row[c]) for c in selected_pollutants]
 
+# Global average pollutant values
+global_vals = [float(agg_df[c].mean()) for c in selected_pollutants]
+
+
 c1, c2, c3 = st.columns(3)
 
 # -------- GLOBAL CARD --------
-c1.markdown(f"""
-<div class="kpi-card">
-    <div class="kpi-label">Global Average Risk</div>
-    <div class="kpi-value">{avg_risk:.2f}</div>
-    <div class="kpi-sub">Scaled index (0–1)</div>
-</div>
-""", unsafe_allow_html=True)
+# c1.markdown(f"""
+# <div class="kpi-card">
+#     <div class="kpi-label">Global Average Risk</div>
+#     <div class="kpi-value">{avg_risk:.2f}</div>
+#     <div class="kpi-sub">Scaled index (0–1)</div>
+# </div>
+# """, unsafe_allow_html=True)
+
+with c1:
+    st.markdown(f"""
+    <div class="kpi-card">
+        <div class="kpi-label">Global Average Risk</div>
+        <div class="kpi-value">{avg_risk:.2f}</div>
+        <div class="kpi-sub">Scaled index (0–1)</div>
+        <div class="kpi-sub" style="margin-top:8px;">Average Pollutant Breakdown</div>
+    </div>
+    """, unsafe_allow_html=True)
+
+    # ADD mini bar chart under global card
+    st.markdown(mini_bar_chart(global_vals, labels), unsafe_allow_html=True)
+
 
 # -------- WORST COUNTRY --------
 c2.markdown(f"""
