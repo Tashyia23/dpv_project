@@ -2,7 +2,7 @@
 import pandas as pd
 import os
 
-from utils.merged_dataset import load_merged_dataset, build_master_dataset
+from utils.merged_dataset import load_merged_dataset
 
 RAW_DIR = "data/raw"
 
