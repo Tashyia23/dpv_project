@@ -5,6 +5,7 @@ import plotly.express as px
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 
+from utils.loader import load_master_data
 from utils.loader import load_base_data
 from utils.ui import header
 
@@ -13,7 +14,9 @@ st.set_page_config(layout="wide")
 # ---------------------------------------------------------
 # 1. Load merged global dataset
 # ---------------------------------------------------------
-df = load_base_data()
+df = load_master_data()
+
+# df = load_base_data()
 
 header(
     "📈 Time-Series Explorer",
