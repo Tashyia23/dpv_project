@@ -1,12 +1,8 @@
+# utils/ui.py
 import streamlit as st
 
-def header(title, subtitle):
-    st.markdown(
-        f"""
-        <div class="page-header-card">
-            <div class="page-header-title">{title}</div>
-            <div class="page-header-subtitle">{subtitle}</div>
-        </div>
-        """,
-        unsafe_allow_html=True,
-    )
+def header(title, subtitle=None):
+    st.markdown(f"<h2 style='margin-bottom:-10px;'>{title}</h2>", unsafe_allow_html=True)
+    if subtitle:
+        st.caption(subtitle)
+
