@@ -1,49 +1,61 @@
-import os
+# utils/merged_dataset.py
 import pandas as pd
+import os
 
-RAW_DATA_DIR = "data/raw"
+DATA_DIR = "data/merged"
 
-@st.cache_data(show_spinner=False)
-def load_raw_files():
-    """Load all CSV files inside data/raw/ as a dict."""
-    datasets = {}
-    for file in os.listdir(RAW_DATA_DIR):
-        if file.endswith(".csv"):
-            path = os.path.join(RAW_DATA_DIR, file)
-            try:
-                df = pd.read_csv(path)
-                datasets[file.replace(".csv", "")] = df
-            except Exception as e:
-                print(f"⚠ Failed to load {file}: {e}")
-    return datasets
+def load_merged_dataset():
+    """Load the merged dataset (if exists)."""
+    merged_path = os.path.join(DATA_DIR, "merged_master.csv")
 
+    if not os.path.exists(merged_path):
+        return None  # Let loader.py build it
 
-def detect_schema(df):
-    """Returns dataset type based on column patterns."""
-    cols = df.columns.str.lower()
-
-    if "year" in cols:
-        return "time_series"
-
-    if "pm2" in cols.sum():
-        return "pollutant_index"
-
-    if "risk_index" in cols:
-        return "risk_index"
-
-    return "unknown"
+    try:
+        df = pd.read_csv(merged_path)
+        return df
+    except Exception as e:
+        print("Error loading merged dataset:", e)
+        return None
 
 
-@st.cache_data(show_spinner=False)
-def load_master_dataset():
-    """Unified dataset loader for entire dashboard."""
+def build_master_dataset():
+    """
+    Automatically scans data/merged/ for all CSV files and merges them.
+    """
+    if not os.path.exists(DATA_DIR):
+        return None
 
-    all_data = load_raw_files()
+    csv_files = [
+        f for f in os.listdir(DATA_DIR)
+        if f.endswith(".csv") and "master" not in f
+    ]
 
-    master = {}
+    if not csv_files:
+        return None
 
-    for name, df in all_data.items():
-        df_type = detect_schema(df)
-        master[df_type] = df
+    dfs = []
+    for f in csv_files:
+        try:
+            df = pd.read_csv(os.path.join(DATA_DIR, f))
+            dfs.append(df)
+        except:
+            pass
 
-    return master
+    if not dfs:
+        return None
+
+    # merge on common columns only
+    base = dfs[0]
+    for df in dfs[1:]:
+        common = list(set(base.columns).intersection(set(df.columns)))
+        if not common:
+            continue
+        base = pd.merge(base, df, on=common, how="outer")
+
+    # Save master file
+    master_path = os.path.join(DATA_DIR, "merged_master.csv")
+    base.to_csv(master_path, index=False)
+
+    return base
+
