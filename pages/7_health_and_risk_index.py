@@ -297,17 +297,47 @@ else:
 # ====================================================================================
 # 6. Risk Ranking
 # ====================================================================================
+
+# ---------------------------------------------------
+# 4. Dynamic Risk Ranking (Updated)
+# ---------------------------------------------------
+st.markdown("<div class='chart-card'>", unsafe_allow_html=True)
 st.markdown("### 3. Country Risk Ranking")
 
-top_n = st.slider("Show top N highest-risk countries", 5, 30, 10)
+# --- New Filter Options ---
+rank_mode = st.radio(
+    "Select ranking type:",
+    [
+        "Highest-Risk Countries",
+        "Lowest-Risk Countries",
+        "Average / Moderate Countries"
+    ]
+)
 
-top_df = agg_df.sort_values("risk_index", ascending=False).head(top_n)
+top_n = st.slider("Select number of countries to display", 5, 30, 10)
 
+# --- Determine Subset Based on User Choice ---
+if rank_mode == "Highest-Risk Countries":
+    subset_df = agg_df.sort_values("risk_index", ascending=False).head(top_n)
+    chart_title = f"Top {top_n} Highest-Risk Countries"
+
+elif rank_mode == "Lowest-Risk Countries":
+    subset_df = agg_df.sort_values("risk_index", ascending=True).head(top_n)
+    chart_title = f"Top {top_n} Lowest-Risk Countries"
+
+else:
+    # Filter only Moderate-level countries (middle quartiles)
+    mid_df = agg_df[agg_df["risk_level"].isin(["Moderate", "High"])]
+    subset_df = mid_df.sort_values("risk_index").head(top_n)
+    chart_title = f"{top_n} Moderate-Risk Countries (Middle Quartiles)"
+
+# --- Plot ---
 fig = px.bar(
-    top_df,
-    x="country", y="risk_index",
+    subset_df,
+    x="country",
+    y="risk_index",
     color="risk_level",
-    title=f"Top {top_n} Highest-Risk Countries",
+    title=chart_title,
     color_discrete_map={
         "Low": "#22c55e",
         "Moderate": "#eab308",
@@ -315,11 +345,19 @@ fig = px.bar(
         "Very High": "#ef4444",
     }
 )
-fig.update_layout(height=450, margin=dict(l=0, r=0, t=40, b=0))
+
+fig.update_layout(
+    height=450,
+    margin=dict(l=0, r=0, t=40, b=0),
+)
+
 st.plotly_chart(fig, use_container_width=True)
 
 with st.expander("Show full table"):
-    st.dataframe(agg_df.sort_values("risk_index", ascending=False))
+    st.dataframe(subset_df)
+
+st.markdown("</div>", unsafe_allow_html=True)
+
 
 
 # ====================================================================================
