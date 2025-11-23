@@ -41,9 +41,9 @@ if "year" not in df.columns:
     st.stop()
 
 # Make sure year is numeric (int) and sorted
-df["year"] = pd.to_numeric(df["year"], errors="coerce")
-df = df.dropna(subset=["year"])
-df["year"] = df["year"].astype(int)
+df["Year"] = pd.to_numeric(df["Year"], errors="coerce")
+df = df.dropna(subset=["Year"])
+df["Year"] = df["Year"].astype(int)
 
 # Region safety (in case some rows are missing region)
 if "region" not in df.columns:
