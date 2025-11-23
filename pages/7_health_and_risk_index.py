@@ -298,87 +298,138 @@ else:
 # 6. Country Risk Ranking
 # ====================================================================================
 
-# -----------------------------------------
-# POLLUTANT RANKING MODE (NEW FEATURE)
-# -----------------------------------------
-ranking_type = st.radio(
-    "Ranking mode:",
-    ["Overall Risk Index", "PM2.5", "NO₂", "O₃", "CO", "PM10"],
-    horizontal=True
-)
+# st.markdown("<div class='chart-card'>", unsafe_allow_html=True)
+# st.markdown("### 3. Country Risk Ranking")
 
-# Map pollutant names to dataset columns
-pollutant_cols = {
-    "PM2.5": "pm25_aqi_value",
-    "PM10": "pm10_aqi_value" if "pm10_aqi_value" in df.columns else None,
-    "NO₂": "no2_aqi_value",
-    "O₃": "ozone_aqi_value",
-    "CO": "co_aqi_value"
-}
+# mode = st.radio(
+#     "Choose ranking type:",
+#     ["Highest Risk", "Lowest Risk", "Middle (Average Range)", "Custom Percentile"],
+#     horizontal=True
+# )
 
-# Determine which ranking mode to use
-if ranking_type == "Overall Risk Index":
-    metric_col = "risk_index"
-    metric_label = "Overall Risk Index"
-else:
-    metric_col = pollutant_cols[ranking_type]
-    metric_label = f"{ranking_type} AQI Value"
+# if mode == "Highest Risk":
+#     top_n = st.slider("Show top N highest-risk countries", 5, 30, 10)
+#     display_df = agg_df.sort_values("risk_index", ascending=False).head(top_n)
+#     title = f"Top {top_n} Countries (Highest Overall Risk)"
 
-# Handle unavailable pollutants safely
-if metric_col is None:
-    st.warning(f"⚠ Your dataset does not contain {ranking_type}.")
-    st.stop()
+# elif mode == "Lowest Risk":
+#     top_n = st.slider("Show top N lowest-risk countries", 5, 30, 10)
+#     display_df = agg_df.sort_values("risk_index", ascending=True).head(top_n)
+#     title = f"Top {top_n} Countries (Lowest Overall Risk)"
 
-# -----------------------------------------
-# Show N countries for this metric
-# -----------------------------------------
-top_n = st.slider(f"Show top N countries by {metric_label}", 5, 30, 10)
+# elif mode == "Middle (Average Range)":
+#     st.info("Showing countries around the global median risk.")
+#     q1, median, q3 = np.percentile(agg_df["risk_index"], [25, 50, 75])
+#     display_df = agg_df[(agg_df["risk_index"] >= q1) & (agg_df["risk_index"] <= q3)]
+#     title = "Countries in the Average/Mid-Risk Range"
 
-display_df = agg_df.sort_values(metric_col, ascending=False).head(top_n)
+# else:  # Custom Percentile
+#     low_p, high_p = st.slider("Select percentile range", 0, 100, (20, 80))
+#     lo = np.percentile(agg_df["risk_index"], low_p)
+#     hi = np.percentile(agg_df["risk_index"], high_p)
+#     display_df = agg_df[(agg_df["risk_index"] >= lo) & (agg_df["risk_index"] <= hi)]
+#     title = f"Countries Between {low_p}th and {high_p}th Percentile Risk"
 
-title = f"Top {top_n} Countries ({metric_label})"
+# # ----- CLEAN BAR CHART (NO URL ISSUE) -----
+# fig = px.bar(
+#     display_df,
+#     x="country", y="risk_index",
+#     color="risk_level",
+#     title=title,
+#     color_discrete_map={
+#         "Low": "#22c55e",
+#         "Moderate": "#eab308",
+#         "High": "#f97316",
+#         "Very High": "#ef4444",
+#     }
+# )
 
+# fig.update_traces(text=None, hovertemplate="<b>%{x}</b><br>Risk: %{y:.3f}")
+# fig.update_layout(height=450, margin=dict(l=0, r=0, t=40, b=0))
 
+# st.plotly_chart(fig, use_container_width=True)
 
+# with st.expander("Show full table"):
+#     st.dataframe(display_df.sort_values("risk_index", ascending=False))
+
+# st.markdown("</div>", unsafe_allow_html=True)
+
+# ---------------------------------------------------
+# 3. Country Risk Ranking (NEW VERSION WITH 2 TOGGLES)
+# ---------------------------------------------------
 
 st.markdown("<div class='chart-card'>", unsafe_allow_html=True)
 st.markdown("### 3. Country Risk Ranking")
 
-mode = st.radio(
-    "Choose ranking type:",
-    ["Highest Risk", "Lowest Risk", "Middle (Average Range)", "Custom Percentile"],
+# -------------------------------
+# 🔹 TOGGLE 1 – Ranking Type
+# -------------------------------
+ranking_mode = st.radio(
+    "Select ranking type:",
+    ["Highest Risk", "Lowest Risk", "Average", "Custom Percentile"],
     horizontal=True
 )
 
-if mode == "Highest Risk":
-    top_n = st.slider("Show top N highest-risk countries", 5, 30, 10)
-    display_df = agg_df.sort_values("risk_index", ascending=False).head(top_n)
-    title = f"Top {top_n} Countries (Highest Overall Risk)"
+# -------------------------------
+# 🔹 TOGGLE 2 – Pollutant Selector
+# -------------------------------
+pollutant_choices = {
+    "Overall Risk Index": "risk_index",
+    "PM₂.₅ (Fine Particles)": "pm25_aqi_value",
+    "NO₂ (Nitrogen Dioxide)": "no2_aqi_value",
+    "O₃ (Ozone)": "ozone_aqi_value",
+    "CO (Carbon Monoxide)": "co_aqi_value",
+    "PM₁₀ (Coarse Particles)": "pm10_aqi_value"
+}
 
-elif mode == "Lowest Risk":
-    top_n = st.slider("Show top N lowest-risk countries", 5, 30, 10)
-    display_df = agg_df.sort_values("risk_index", ascending=True).head(top_n)
-    title = f"Top {top_n} Countries (Lowest Overall Risk)"
+pollutant_selected = st.selectbox(
+    "Pollutant used for ranking:",
+    list(pollutant_choices.keys())
+)
 
-elif mode == "Middle (Average Range)":
-    st.info("Showing countries around the global median risk.")
-    q1, median, q3 = np.percentile(agg_df["risk_index"], [25, 50, 75])
-    display_df = agg_df[(agg_df["risk_index"] >= q1) & (agg_df["risk_index"] <= q3)]
-    title = "Countries in the Average/Mid-Risk Range"
+metric_col = pollutant_choices[pollutant_selected]
+
+# If pollutant is not risk_index, compute new scaled metric
+if metric_col != "risk_index":
+    col_vals = agg_df[metric_col].astype(float)
+    lo, hi = col_vals.min(), col_vals.max()
+    agg_df["metric_scaled"] = (col_vals - lo) / (hi - lo) if hi > lo else 0
+else:
+    agg_df["metric_scaled"] = agg_df["risk_index"]
+
+# -------------------------------
+# 🔹 Ranking Logic
+# -------------------------------
+if ranking_mode == "Highest Risk":
+    filtered = agg_df.sort_values("metric_scaled", ascending=False)
+
+elif ranking_mode == "Lowest Risk":
+    filtered = agg_df.sort_values("metric_scaled", ascending=True)
+
+elif ranking_mode == "Average":
+    # Rank by closeness to global mean
+    global_mean = agg_df["metric_scaled"].mean()
+    filtered = agg_df.iloc[(agg_df["metric_scaled"] - global_mean).abs().argsort()]
 
 else:  # Custom Percentile
-    low_p, high_p = st.slider("Select percentile range", 0, 100, (20, 80))
-    lo = np.percentile(agg_df["risk_index"], low_p)
-    hi = np.percentile(agg_df["risk_index"], high_p)
-    display_df = agg_df[(agg_df["risk_index"] >= lo) & (agg_df["risk_index"] <= hi)]
-    title = f"Countries Between {low_p}th and {high_p}th Percentile Risk"
+    percentile = st.slider("Select percentile (Top X%)", 1, 50, 10)
+    cutoff = np.percentile(agg_df["metric_scaled"], 100 - percentile)
+    filtered = agg_df[agg_df["metric_scaled"] >= cutoff].sort_values("metric_scaled", ascending=False)
 
-# ----- CLEAN BAR CHART (NO URL ISSUE) -----
+# Let user choose N items
+top_n = st.slider("Show top N countries", 5, 30, 10)
+
+final_df = filtered.head(top_n)
+
+# -------------------------------
+# 🔹 Plotly Bar Chart
+# -------------------------------
 fig = px.bar(
-    display_df,
-    x="country", y="risk_index",
+    final_df,
+    x="country",
+    y="metric_scaled",
     color="risk_level",
-    title=title,
+    title=f"Top {top_n} Countries ({ranking_mode} — {pollutant_selected})",
     color_discrete_map={
         "Low": "#22c55e",
         "Moderate": "#eab308",
@@ -387,13 +438,14 @@ fig = px.bar(
     }
 )
 
-fig.update_traces(text=None, hovertemplate="<b>%{x}</b><br>Risk: %{y:.3f}")
 fig.update_layout(height=450, margin=dict(l=0, r=0, t=40, b=0))
+fig.update_xaxes(tickangle=45)
 
 st.plotly_chart(fig, use_container_width=True)
 
-with st.expander("Show full table"):
-    st.dataframe(display_df.sort_values("risk_index", ascending=False))
+# Show table
+with st.expander("Show full data"):
+    st.dataframe(final_df)
 
 st.markdown("</div>", unsafe_allow_html=True)
 
