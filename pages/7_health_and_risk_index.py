@@ -120,6 +120,8 @@ if not selected_pollutants:
     st.warning("Please select at least one pollutant.")
     st.stop()
 
+st.markdown("</div>", unsafe_allow_html=True)
+
 
 # ---------------------------------------------------
 # Weight Presets
