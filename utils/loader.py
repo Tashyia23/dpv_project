@@ -1,6 +1,7 @@
 # utils/loader.py
 import pandas as pd
 import streamlit as st
+from utils.regions import assign_region   # ⬅ NEW
 
 @st.cache_data(ttl=600, show_spinner=True)
 def load_base_data() -> pd.DataFrame:
@@ -39,6 +40,12 @@ def load_base_data() -> pd.DataFrame:
 
     if rename_map:
         df = df.rename(columns=rename_map)
+
+    # 🔹 Add region column using country name
+    if "country" in df.columns:
+        df["region"] = df["country"].apply(assign_region)
+    else:
+        df["region"] = "Other"
 
     return df
 
