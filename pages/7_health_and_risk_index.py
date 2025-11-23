@@ -148,7 +148,7 @@ agg_df["risk_level"] = agg_df["risk_index"].apply(classify)
 
 
 # ====================================================================================
-# 3. PREMIUM FEATURE A — RISK LEVEL TABS
+# 3. RISK LEVEL TABS
 # ====================================================================================
 st.markdown("### 🌡 Risk-Level Explorer")
 
@@ -174,7 +174,7 @@ with tab5:
 
 
 # ====================================================================================
-# 4. PREMIUM FEATURE B — INTERACTIVE WORLD MAP
+# 4. INTERACTIVE WORLD MAP
 # ====================================================================================
 st.markdown("### 🗺 World Risk Map (Choropleth)")
 
@@ -191,7 +191,7 @@ st.plotly_chart(map_fig, use_container_width=True)
 
 
 # ====================================================================================
-# 5. PREMIUM FEATURE C — AUTO INSIGHTS
+# 5. AUTO INSIGHTS
 # ====================================================================================
 st.markdown("### 🤖 Auto Insights")
 
@@ -207,6 +207,91 @@ st.markdown(f"""
 - 📊 **Most influential pollutant** (weighted): **{max(norm_weights, key=norm_weights.get)}**
 - ⚠ Countries with **Very High risk** tend to have elevated **PM2.5 + NO₂** levels.
 """)
+
+# ====================================================================================
+# 6. PREMIUM FEATURE D — COMPARE COUNTRIES SIDE-BY-SIDE
+# ====================================================================================
+st.markdown("### 🆚 Compare Two Countries (Side-by-Side Analysis)")
+
+colA, colB = st.columns(2)
+
+with colA:
+    country_a = st.selectbox(
+        "Select Country A",
+        agg_df["country"].sort_values().unique(),
+        key="country_a"
+    )
+
+with colB:
+    country_b = st.selectbox(
+        "Select Country B",
+        agg_df["country"].sort_values().unique(),
+        key="country_b"
+    )
+
+# Avoid same-country comparison
+if country_a == country_b:
+    st.warning("⚠ Please choose two different countries for comparison.")
+else:
+    a_row = agg_df[agg_df["country"] == country_a].iloc[0]
+    b_row = agg_df[agg_df["country"] == country_b].iloc[0]
+
+    labels = [pollutant_info[c][1] for c in selected_pollutants]
+    a_vals = [float(a_row[c]) for c in selected_pollutants]
+    b_vals = [float(b_row[c]) for c in selected_pollutants]
+
+    # --------------------------------------------------------------------------
+    # SIDE-BY-SIDE UI
+    # --------------------------------------------------------------------------
+    cA, cB = st.columns(2)
+
+    with cA:
+        st.markdown(f"""
+        <div class="kpi-card">
+            <div class="kpi-label">{country_a}</div>
+            <div class="kpi-value">{a_row['risk_index']:.2f}</div>
+            <div class="kpi-sub">Risk Level: {a_row['risk_level']}</div>
+        </div>
+        """, unsafe_allow_html=True)
+        st.markdown("#### Pollutant Breakdown")
+        st.markdown(mini_bar_chart(a_vals, labels), unsafe_allow_html=True)
+
+    with cB:
+        st.markdown(f"""
+        <div class="kpi-card">
+            <div class="kpi-label">{country_b}</div>
+            <div class="kpi-value">{b_row['risk_index']:.2f}</div>
+            <div class="kpi-sub">Risk Level: {b_row['risk_level']}</div>
+        </div>
+        """, unsafe_allow_html=True)
+        st.markdown("#### Pollutant Breakdown")
+        st.markdown(mini_bar_chart(b_vals, labels), unsafe_allow_html=True)
+
+    # --------------------------------------------------------------------------
+    # AUTO INTERPRETATION
+    # --------------------------------------------------------------------------
+    st.markdown("### 🔍 Interpretation")
+
+    diff = a_row["risk_index"] - b_row["risk_index"]
+    higher = country_a if diff > 0 else country_b
+    gap = abs(diff)
+
+    st.markdown(f"""
+    **Comparison Summary**
+    - **Higher risk:** `{higher}`  
+    - **Risk gap:** `{gap:.2f}`  
+    - **Key pollutant difference:** `{labels[np.argmax(np.abs(np.array(a_vals)-np.array(b_vals)))]}`  
+    """)
+
+    # Detailed breakdown table
+    comp_df = pd.DataFrame({
+        "Pollutant": labels,
+        country_a: a_vals,
+        country_b: b_vals,
+        "Difference": np.array(a_vals) - np.array(b_vals)
+    })
+
+    st.dataframe(comp_df.style.format({country_a: "{:.2f}", country_b: "{:.2f}", "Difference": "{:.2f}"}))
 
 
 # ====================================================================================
