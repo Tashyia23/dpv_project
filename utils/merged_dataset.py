@@ -1,45 +1,49 @@
-# utils/merged_datasets.py
-
-import pandas as pd
 import os
+import pandas as pd
 
-def load_raw_global():
-    """Load raw global air pollution dataset."""
-    path = os.path.join("data", "raw", "global_air_pollution.csv")
-    return pd.read_csv(path)
+RAW_DATA_DIR = "data/raw"
 
-def load_raw_pm25():
-    """Load raw PM2.5 time-series dataset."""
-    path = os.path.join("data", "raw", "pm25-air-pollution.csv")
-    return pd.read_csv(path)
+@st.cache_data(show_spinner=False)
+def load_raw_files():
+    """Load all CSV files inside data/raw/ as a dict."""
+    datasets = {}
+    for file in os.listdir(RAW_DATA_DIR):
+        if file.endswith(".csv"):
+            path = os.path.join(RAW_DATA_DIR, file)
+            try:
+                df = pd.read_csv(path)
+                datasets[file.replace(".csv", "")] = df
+            except Exception as e:
+                print(f"⚠ Failed to load {file}: {e}")
+    return datasets
 
-def load_merged_dataset():
-    """
-    Returns combined dataset:
-    - global pollution raw data
-    - PM2.5 time-series raw data
-    No preprocessing is done here.
-    """
-    try:
-        df_global = load_raw_global()
-    except Exception:
-        df_global = pd.DataFrame()
 
-    try:
-        df_pm25 = load_raw_pm25()
-    except Exception:
-        df_pm25 = pd.DataFrame()
+def detect_schema(df):
+    """Returns dataset type based on column patterns."""
+    cols = df.columns.str.lower()
 
-    if not df_global.empty:
-        df_global["source"] = "global_pollution"
+    if "year" in cols:
+        return "time_series"
 
-    if not df_pm25.empty:
-        df_pm25["source"] = "pm25_timeseries"
+    if "pm2" in cols.sum():
+        return "pollutant_index"
 
-    merged_df = pd.concat([df_global, df_pm25], ignore_index=True, sort=False)
+    if "risk_index" in cols:
+        return "risk_index"
 
-    return merged_df
+    return "unknown"
 
+
+@st.cache_data(show_spinner=False)
 def load_master_dataset():
-    return load_merged_dataset()
+    """Unified dataset loader for entire dashboard."""
 
+    all_data = load_raw_files()
+
+    master = {}
+
+    for name, df in all_data.items():
+        df_type = detect_schema(df)
+        master[df_type] = df
+
+    return master
