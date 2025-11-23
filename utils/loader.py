@@ -67,4 +67,3 @@ def load_pm25_data():
         return pd.read_csv(pm_path)
     except:
         return None
-
