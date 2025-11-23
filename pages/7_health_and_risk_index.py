@@ -24,25 +24,36 @@ if "country" not in df.columns:
 # ---------------------------------------------------
 # 1. Choose pollutants and build a risk score
 # ---------------------------------------------------
+# -----------------------------------------------------------
+# 1. Configure Risk Score (Improved UI)
+# -----------------------------------------------------------
 st.markdown("<div class='chart-card'>", unsafe_allow_html=True)
 st.markdown("### 1. Configure Risk Score")
 
 st.markdown(
     """
-    Select which pollutants are included in the health risk index.
-    All selected pollutants are **equally weighted** by default.
-    
-    If you want to customise weights, turn on **Advanced Mode**.
+    Select which pollutants should contribute to the **Health & Pollution Risk Index**.  
+    By default, each pollutant is **equally weighted** so users do not need to tune anything.
+
+    If needed, enable **Advanced Mode** to customise individual pollutant weights.
     """
 )
 
-# Pollutant options
-pollutant_options = [c for c in df.columns if c.endswith("_aqi_value")]
+# Detect AQI pollutant columns
+pollutant_options = [
+    col for col in df.columns 
+    if col.endswith("_aqi_value") and col != "aqi_value"
+]
 
+if not pollutant_options:
+    st.error("No pollutant AQI columns found in the dataset.")
+    st.stop()
+
+# Simple pollutant multi-selector
 selected_pollutants = st.multiselect(
-    "Pollutants to include",
+    "Pollutants to include in the risk index",
     pollutant_options,
-    default=pollutant_options,  # everything selected
+    default=pollutant_options,  # Select all by default
 )
 
 if not selected_pollutants:
@@ -52,29 +63,46 @@ if not selected_pollutants:
 # -----------------------------------------------------------
 # Advanced mode toggle
 # -----------------------------------------------------------
-advanced = st.toggle("🔧 Advanced Mode (custom weights)", value=False)
+advanced_mode = st.toggle("🔧 Enable Advanced Mode (custom weights)", value=False)
 
-if advanced:
-    st.caption("Adjust the weight of each pollutant. Weights will be normalised automatically.")
+if advanced_mode:
+    st.caption(
+        """
+        **Advanced Mode:**  
+        Adjust individual pollutant weights below.  
+        Weights will be **normalised automatically** so they add up to 1.
+        """
+    )
+
     weights = {}
     total_weight = 0.0
 
     for col in selected_pollutants:
         w = st.slider(
             f"Weight for {col}",
-            min_value=0.0, max_value=10.0,
-            value=1.0, step=0.1
+            min_value=0.0,
+            max_value=10.0,
+            value=1.0,
+            step=0.1,
+            key=f"weight_{col}",
         )
         weights[col] = w
         total_weight += w
 
+    # Normalise weights
     if total_weight == 0:
         norm_weights = {c: 1 / len(selected_pollutants) for c in selected_pollutants}
     else:
         norm_weights = {c: w / total_weight for c, w in weights.items()}
 
 else:
-    # Simple equal weights
+    # SIMPLE MODE → Equal weights
+    st.caption(
+        """
+        **Simple Mode:**  
+        All pollutants are equally weighted to avoid bias and keep interpretation easy.
+        """
+    )
     norm_weights = {c: 1 / len(selected_pollutants) for c in selected_pollutants}
 
 st.markdown("</div>", unsafe_allow_html=True)
