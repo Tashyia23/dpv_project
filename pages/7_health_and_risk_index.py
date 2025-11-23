@@ -407,6 +407,9 @@
 # - Presets follow scientific frameworks (WHO, EPA)  
 # """)
 
+
+#_____________________________________________
+
 import streamlit as st
 import numpy as np
 import pandas as pd
@@ -444,7 +447,7 @@ def mini_bar_chart(values, labels, max_width=160, height=8, colors=None):
 
 
 # ------------------------------------------------------------------------------------
-# Load Data
+# Load Data (RAW – before processing)
 # ------------------------------------------------------------------------------------
 df = load_base_data()
 
@@ -461,13 +464,13 @@ if "country" not in df.columns:
     st.error("Dataset missing column 'country'.")
     st.stop()
 
-# Ensure region exists (some pages use it)
+# Ensure region exists (some pages may rely on it)
 if "region" not in df.columns:
     df["region"] = "Other"
 
 
 # ------------------------------------------------------------------------------------
-# 1. Configure Risk Score
+# 1. Configure Risk Score (pollutants + weights)
 # ------------------------------------------------------------------------------------
 st.markdown("<div class='chart-card'>", unsafe_allow_html=True)
 st.markdown("### 1. Configure Risk Score")
@@ -480,7 +483,7 @@ pollutant_info = {
     "co_aqi_value": ("🔥", "CO (Carbon Monoxide)"),
 }
 
-# ✅ Only use pollutants that actually exist in the dataframe
+# Only use pollutants that actually exist in the dataframe
 pollutant_options = [c for c in pollutant_info.keys() if c in df.columns]
 
 if not pollutant_options:
@@ -556,15 +559,72 @@ st.markdown("</div>", unsafe_allow_html=True)
 
 
 # ------------------------------------------------------------------------------------
-# 2. Compute Risk Index
+# 2. BEFORE vs AFTER TOGGLE
 # ------------------------------------------------------------------------------------
-agg_df = df[["country"] + selected_pollutants].groupby("country").mean().reset_index()
+st.markdown("### 🧪 Data View Mode — Before vs After Processing")
+
+view_mode = st.radio(
+    "Choose how to explore the data:",
+    ["Raw AQI Data (Before Processing)", "Computed Risk Index (After Processing)"],
+    horizontal=True,
+)
+
+# Aggregate pollutants by country (RAW)
+raw_agg = df[["country"] + selected_pollutants].groupby("country").mean().reset_index()
+
+if view_mode == "Raw AQI Data (Before Processing)":
+    # -------------------------------------------------------------------------
+    # RAW VIEW (Before Processing)
+    # -------------------------------------------------------------------------
+    st.markdown("#### 🌫 Raw Pollutant AQI by Country (Before Processing)")
+
+    raw_pollutant = st.selectbox(
+        "Select pollutant to inspect (raw AQI):",
+        selected_pollutants,
+        format_func=lambda col: pretty_labels[col],
+        key="raw_pollutant_choice"
+    )
+
+    raw_plot_df = raw_agg.sort_values(raw_pollutant, ascending=False).head(30)
+
+    fig_raw = px.bar(
+        raw_plot_df,
+        x="country",
+        y=raw_pollutant,
+        title=f"Top 30 Countries by Raw {pretty_labels[raw_pollutant]}",
+        labels={raw_pollutant: "AQI (Raw)"},
+    )
+    fig_raw.update_layout(height=450, margin=dict(l=0, r=0, t=40, b=0))
+    fig_raw.update_xaxes(tickangle=45)
+    st.plotly_chart(fig_raw, use_container_width=True)
+
+    with st.expander("Show raw aggregated table"):
+        st.dataframe(raw_agg, use_container_width=True)
+
+    st.info(
+        "You are currently viewing **raw AQI values (before processing)**.\n\n"
+        "Switch to **'Computed Risk Index (After Processing)'** above to see the weighted, "
+        "normalised risk index, risk levels, world map, and comparisons."
+    )
+
+    # ❗ Stop here so the rest of the page (risk index stuff) doesn't run
+    st.stop()
+
+
+# ====================================================================================
+# FROM THIS POINT ON: AFTER PROCESSING (Risk Index)
+# ====================================================================================
+
+# ------------------------------------------------------------------------------------
+# 3. Compute Risk Index (AFTER processing)
+# ------------------------------------------------------------------------------------
+agg_df = raw_agg.copy()  # start from the RAW aggregated values
 
 scaled = {}
 for col in selected_pollutants:
     series = agg_df[col].astype(float)
     lo, hi = series.min(), series.max()
-    scaled[col] = (series - lo) / (hi - lo) if hi > lo else np.zeros_like(series)
+    scaled[col] = (series - lo) / (hi - lo) if hi > 0 and hi > lo else np.zeros_like(series)
 
 scaled_df = pd.DataFrame(scaled)
 agg_df["risk_index"] = sum(scaled_df[c] * norm_weights[c] for c in selected_pollutants)
@@ -584,9 +644,9 @@ agg_df["risk_level"] = agg_df["risk_index"].apply(classify)
 
 
 # ====================================================================================
-# 3. RISK LEVEL TABS
+# 4. RISK LEVEL TABS
 # ====================================================================================
-st.markdown("### 🌡 Risk-Level Explorer")
+st.markdown("### 🌡 Risk-Level Explorer (After Processing)")
 
 tab1, tab2, tab3, tab4, tab5 = st.tabs(["Very High", "High", "Moderate", "Low", "All"])
 
@@ -604,6 +664,7 @@ for tab, level in zip([tab1, tab2, tab3, tab4], ["Very High", "High", "Moderate"
                 title=f"{level} Risk Level",
                 color_discrete_sequence=["#ef4444" if level == "Very High" else "#f97316"],
             )
+            fig.update_xaxes(tickangle=45)
             st.plotly_chart(fig, use_container_width=True)
             st.dataframe(sub)
 
@@ -613,7 +674,7 @@ with tab5:
 
 
 # ====================================================================================
-# 4. INTERACTIVE WORLD MAP
+# 5. INTERACTIVE WORLD MAP
 # ====================================================================================
 st.markdown("### 🗺 World Risk Map (Choropleth)")
 
@@ -630,7 +691,7 @@ st.plotly_chart(map_fig, use_container_width=True)
 
 
 # ====================================================================================
-# 5. AUTO INSIGHTS
+# 6. AUTO INSIGHTS
 # ====================================================================================
 st.markdown("### 🤖 Auto Insights")
 
@@ -649,7 +710,7 @@ st.markdown(f"""
 
 
 # ====================================================================================
-# 6. COMPARE COUNTRIES SIDE-BY-SIDE
+# 7. COMPARE COUNTRIES SIDE-BY-SIDE
 # ====================================================================================
 st.markdown("### 🆚 Compare Two Countries (Side-by-Side Analysis)")
 
@@ -741,7 +802,7 @@ else:
 
 
 # ---------------------------------------------------
-# 3. Country Risk Ranking (WITH 2 TOGGLES)
+# 8. Country Risk Ranking (WITH 2 TOGGLES)
 # ---------------------------------------------------
 st.markdown("<div class='chart-card'>", unsafe_allow_html=True)
 st.markdown("### 3. Country Risk Ranking")
@@ -823,7 +884,7 @@ st.markdown("</div>", unsafe_allow_html=True)
 
 
 # ====================================================================================
-# 7. Interpretation
+# 9. Interpretation
 # ====================================================================================
 st.markdown(
     """
