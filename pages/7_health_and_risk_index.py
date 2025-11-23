@@ -195,39 +195,48 @@ best_vals = [float(best_row[c]) for c in selected_pollutants]
 c1, c2, c3 = st.columns(3)
 
 with c1:
-    st.markdown(
-        f"""
-        <div class="kpi-card">
-            <div class="kpi-label">Global Average Risk</div>
-            <div class="kpi-value">{avg_risk:.2f}</div>
-            <div class="kpi-sub">Scaled index (0–1)</div>
+    st.markdown(f"""
+        <div class="kpi-card" style="padding:20px; border-radius:14px; background:white; box-shadow:0 2px 8px rgba(0,0,0,0.06);">
+            <div style="font-size:1rem; font-weight:600; color:#6B7280;">Global Average Risk</div>
+            <div style="font-size:2rem; font-weight:700; margin-top:8px;">{avg_risk:.2f}</div>
+            <div style="font-size:0.9rem; color:#6B7280;">Scaled Index (0–1)</div>
         </div>
-        """, unsafe_allow_html=True
-    )
+    """, unsafe_allow_html=True)
+
 
 with c2:
-    st.markdown(
-        f"""
-        <div class="kpi-card">
-            <div class="kpi-label">Highest Risk Country</div>
-            <div class="kpi-value">{worst_row['country']}</div>
-            <div class="kpi-sub">Index {worst_row['risk_index']:.2f} ({worst_row['risk_level']})</div>
-            {mini_bar_chart(worst_vals, labels)}
+    worst_bars_html = mini_bar_chart(worst_vals, labels)
+    st.markdown(f"""
+        <div class="kpi-card" style="padding:20px; border-radius:14px; background:white; box-shadow:0 2px 8px rgba(0,0,0,0.06);">
+            <div style="font-size:1rem; font-weight:600; color:#6B7280;">Highest Risk Country</div>
+            <div style="font-size:1.6rem; font-weight:700; margin-top:6px;">{worst_row['country']}</div>
+            <div style="margin-top:4px; font-size:0.9rem; color:#4B5563;">
+                <span style="padding:3px 10px; background:#fee2e2; border-radius:6px; color:#b91c1c; font-weight:600;">
+                    {worst_row['risk_index']:.2f} ({worst_row['risk_level']})
+                </span>
+            </div>
+            <div style="margin-top:10px; font-size:0.8rem; color:#6B7280;">Pollutant Breakdown</div>
+            {worst_bars_html}
         </div>
-        """, unsafe_allow_html=True
-    )
+    """, unsafe_allow_html=True)
+
 
 with c3:
-    st.markdown(
-        f"""
-        <div class="kpi-card">
-            <div class="kpi-label">Lowest Risk Country</div>
-            <div class="kpi-value">{best_row['country']}</div>
-            <div class="kpi-sub">Index {best_row['risk_index']:.2f} ({best_row['risk_level']})</div>
-            {mini_bar_chart(best_vals, labels)}
+    best_bars_html = mini_bar_chart(best_vals, labels)
+    st.markdown(f"""
+        <div class="kpi-card" style="padding:20px; border-radius:14px; background:white; box-shadow:0 2px 8px rgba(0,0,0,0.06);">
+            <div style="font-size:1rem; font-weight:600; color:#6B7280;">Lowest Risk Country</div>
+            <div style="font-size:1.6rem; font-weight:700; margin-top:6px;">{best_row['country']}</div>
+            <div style="margin-top:4px; font-size:0.9rem; color:#4B5563;">
+                <span style="padding:3px 10px; background:#d1fae5; border-radius:6px; color:#047857; font-weight:600;">
+                    {best_row['risk_index']:.2f} ({best_row['risk_level']})
+                </span>
+            </div>
+            <div style="margin-top:10px; font-size:0.8rem; color:#6B7280;">Pollutant Breakdown</div>
+            {best_bars_html}
         </div>
-        """, unsafe_allow_html=True
-    )
+    """, unsafe_allow_html=True)
+
 
 st.markdown("</div>", unsafe_allow_html=True)
 
