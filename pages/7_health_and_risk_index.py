@@ -197,7 +197,7 @@ if view_mode.startswith("Before"):
         # -------------------------------------------------------------------------
     # 📊 EXTRA RAW VISUALISATIONS (Histogram, Boxplot, Heatmap, Scatter)
     # -------------------------------------------------------------------------
-    st.markdown("### 1B. Additional Visualisations (Raw AQI)")
+    st.markdown("")
 
     colX, colY = st.columns(2)
 
