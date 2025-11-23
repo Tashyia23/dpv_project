@@ -209,7 +209,7 @@ st.markdown(f"""
 """)
 
 # ====================================================================================
-# 6. PREMIUM FEATURE D — COMPARE COUNTRIES SIDE-BY-SIDE
+# 6. COMPARE COUNTRIES SIDE-BY-SIDE
 # ====================================================================================
 st.markdown("### 🆚 Compare Two Countries (Side-by-Side Analysis)")
 
@@ -299,64 +299,100 @@ else:
 # ====================================================================================
 
 # ---------------------------------------------------
-# 4. Dynamic Risk Ranking (Updated)
+# 4. Advanced Country Ranking (Pollutant Filter + Flags)
 # ---------------------------------------------------
+
 st.markdown("<div class='chart-card'>", unsafe_allow_html=True)
 st.markdown("### 3. Country Risk Ranking")
 
-# --- New Filter Options ---
-rank_mode = st.radio(
+# --- Pollutant selection ---
+ranking_metric = st.selectbox(
+    "Sort countries by:",
+    {
+        "risk_index": "Overall Risk Index",
+        "pm25_aqi_value": "PM2.5 (Fine Particles)",
+        "pm10_aqi_value": "PM10 (Coarse Particles)",
+        "no2_aqi_value": "NO₂ (Nitrogen Dioxide)",
+        "ozone_aqi_value": "O₃ (Ozone)",
+        "co_aqi_value": "CO (Carbon Monoxide)"
+    }
+)
+
+ranking_type = st.radio(
     "Select ranking type:",
-    [
-        "Highest-Risk Countries",
-        "Lowest-Risk Countries",
-        "Average / Moderate Countries"
-    ]
+    ["Highest", "Lowest"]
 )
 
 top_n = st.slider("Select number of countries to display", 5, 30, 10)
 
-# --- Determine Subset Based on User Choice ---
-if rank_mode == "Highest-Risk Countries":
-    subset_df = agg_df.sort_values("risk_index", ascending=False).head(top_n)
-    chart_title = f"Top {top_n} Highest-Risk Countries"
+# Decide ascending/descending
+ascending = ranking_type == "Lowest"
 
-elif rank_mode == "Lowest-Risk Countries":
-    subset_df = agg_df.sort_values("risk_index", ascending=True).head(top_n)
-    chart_title = f"Top {top_n} Lowest-Risk Countries"
+subset_df = agg_df.sort_values(ranking_metric, ascending=ascending).head(top_n)
 
-else:
-    # Filter only Moderate-level countries (middle quartiles)
-    mid_df = agg_df[agg_df["risk_level"].isin(["Moderate", "High"])]
-    subset_df = mid_df.sort_values("risk_index").head(top_n)
-    chart_title = f"{top_n} Moderate-Risk Countries (Middle Quartiles)"
+# Chart title
+pollutant_titles = {
+    "risk_index": "Overall Risk",
+    "pm25_aqi_value": "PM2.5 Levels",
+    "pm10_aqi_value": "PM10 Levels",
+    "no2_aqi_value": "NO₂ Levels",
+    "ozone_aqi_value": "O₃ Levels",
+    "co_aqi_value": "CO Levels"
+}
 
-# --- Plot ---
+title = f"Top {top_n} Countries ({ranking_type} {pollutant_titles[ranking_metric]})"
+
+# --- Country Flag Helper ---
+def flag_img(country_name):
+    iso_map = {
+        "Republic of Korea": "KR",
+        "Kuwait": "KW",
+        "Bahrain": "BH",
+        "Qatar": "QA",
+        "United Arab Emirates": "AE",
+        "Pakistan": "PK",
+        "China": "CN",
+        "Oman": "OM",
+        "Saudi Arabia": "SA",
+        "Nepal": "NP",
+        "Palau": "PW"
+        # Add more if needed
+    }
+
+    code = iso_map.get(country_name, None)
+    if code:
+        return f"<img src='https://flagsapi.com/{code}/flat/32.png' width='26' style='border-radius:4px;'>"
+    return "🏳"
+
+subset_df["flag"] = subset_df["country"].apply(flag_img)
+
+# --- Plot with Flags ---
 fig = px.bar(
     subset_df,
     x="country",
-    y="risk_index",
-    color="risk_level",
-    title=chart_title,
-    color_discrete_map={
-        "Low": "#22c55e",
-        "Moderate": "#eab308",
-        "High": "#f97316",
-        "Very High": "#ef4444",
-    }
+    y=ranking_metric,
+    text="flag",
+    color="risk_level" if ranking_metric == "risk_index" else None,
+    title=title,
 )
 
+fig.update_traces(textposition="inside", insidetextanchor="start")
+
 fig.update_layout(
-    height=450,
+    height=500,
     margin=dict(l=0, r=0, t=40, b=0),
 )
 
 st.plotly_chart(fig, use_container_width=True)
 
-with st.expander("Show full table"):
-    st.dataframe(subset_df)
+# --- Show full table with flags ---
+st.dataframe(
+    subset_df[["flag", "country", ranking_metric, "risk_level"]],
+    use_container_width=True
+)
 
 st.markdown("</div>", unsafe_allow_html=True)
+
 
 
 
