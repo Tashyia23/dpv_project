@@ -26,7 +26,7 @@ def mini_bar_chart(values, labels, max_width=130, height=6, colors=None):
 
     rows = []
     for i, v in enumerate(values):
-        bar_width = int((v / max_val) * max_width) if max_val > 0 else 0
+        bar_width = int((v / max_val) * max_width) if max_val else 0
         color = colors[i % len(colors)]
 
         rows.append(
@@ -47,7 +47,6 @@ def mini_bar_chart(values, labels, max_width=130, height=6, colors=None):
             </div>
             """
         )
-
     return "<div>" + "".join(rows) + "</div>"
 
 
@@ -65,22 +64,12 @@ if "country" not in df.columns:
     st.error("Dataset missing required column: 'country'")
     st.stop()
 
+
 # ---------------------------------------------------
 # 1. Configure Risk Score
 # ---------------------------------------------------
 st.markdown("<div class='chart-card'>", unsafe_allow_html=True)
 st.markdown("### 1. Configure Risk Score")
-
-st.markdown(
-    """
-    Choose pollutants to include in the **Pollution Health Risk Index**.
-
-    - **Beginner Mode:** equal weights  
-    - **WHO Mode:** prioritises health harm  
-    - **EPA Mode:** prioritises regulatory danger  
-    - **Expert Mode:** manually adjust weights  
-    """
-)
 
 pollutant_info = {
     "pm25_aqi_value": ("🟤", "PM2.5 (Fine Particles)"),
@@ -107,6 +96,7 @@ selected_pollutants = st.multiselect(
 if not selected_pollutants:
     st.warning("Please select at least one pollutant.")
     st.stop()
+
 
 # ---------------------------------------------------
 # Weight Presets
@@ -136,16 +126,17 @@ epa_weights = {
     "co_aqi_value": 0.10,
 }
 
+
 # Compute final weights
 if preset == "Beginner Mode (equal weights)":
     norm_weights = equal_weights
 
 elif preset == "WHO Health Severity":
-    total = sum(who_weights.get(c, 0) for c in selected_pollutants)
+    total = sum(who_weights[c] for c in selected_pollutants)
     norm_weights = {c: who_weights[c] / total for c in selected_pollutants}
 
 elif preset == "EPA Danger Scale":
-    total = sum(epa_weights.get(c, 0) for c in selected_pollutants)
+    total = sum(epa_weights[c] for c in selected_pollutants)
     norm_weights = {c: epa_weights[c] / total for c in selected_pollutants}
 
 else:
@@ -159,20 +150,19 @@ else:
         )
         weights[col] = w
         total_w += w
-
     norm_weights = (
-        equal_weights if total_w == 0
-        else {c: weights[c] / total_w for c in selected_pollutants}
+        equal_weights if total_w == 0 else
+        {c: weights[c] / total_w for c in selected_pollutants}
     )
 
 st.markdown("</div>", unsafe_allow_html=True)
+
 
 # ---------------------------------------------------
 # 2. Compute Risk Index
 # ---------------------------------------------------
 agg_df = df[["country"] + selected_pollutants].groupby("country").mean().reset_index()
 
-# Min-max scaling
 scaled = {}
 for col in selected_pollutants:
     series = agg_df[col].astype(float)
@@ -181,10 +171,12 @@ for col in selected_pollutants:
 
 scaled_df = pd.DataFrame(scaled)
 
-agg_df["risk_index"] = sum(scaled_df[c] * norm_weights[c] for c in selected_pollutants)
+agg_df["risk_index"] = sum(
+    scaled_df[c] * norm_weights[c] for c in selected_pollutants
+)
 
-# Classification
 q1, q2, q3 = np.percentile(agg_df["risk_index"], [25, 50, 75])
+
 
 def classify(r):
     if r <= q1: return "Low"
@@ -192,24 +184,21 @@ def classify(r):
     if r <= q3: return "High"
     return "Very High"
 
+
 agg_df["risk_level"] = agg_df["risk_index"].apply(classify)
 
+
 # ---------------------------------------------------
-# 3. KPI Overview with Mini Bars
+# 3. KPI Overview with Mini Bars (CLEANED)
 # ---------------------------------------------------
 
 st.markdown("<div class='chart-card'>", unsafe_allow_html=True)
 st.markdown("### 🌍 Global Pollution Risk Overview")
-st.caption(
-    "The risk index combines normalised pollutant AQI values. "
-    "Mini bars show which pollutants contribute most in each country."
-)
 
 avg_risk = agg_df["risk_index"].mean()
 worst_row = agg_df.loc[agg_df["risk_index"].idxmax()]
 best_row = agg_df.loc[agg_df["risk_index"].idxmin()]
 
-# Use the same order as selected_pollutants
 labels = [pollutant_info[c][1] for c in selected_pollutants]
 worst_vals = [float(worst_row[c]) for c in selected_pollutants]
 best_vals = [float(best_row[c]) for c in selected_pollutants]
@@ -229,7 +218,6 @@ with c1:
     )
 
 with c2:
-    worst_bars_html = mini_bar_chart(worst_vals, labels)
     st.markdown(
         f"""
         <div class="kpi-card">
@@ -238,17 +226,13 @@ with c2:
             <div class="kpi-sub">
                 Index {worst_row['risk_index']:.2f} ({worst_row['risk_level']})
             </div>
-            <div class="section-caption" style="margin-top:0.6rem; font-size:0.75rem; color:#6B7280;">
-                Pollutant breakdown (higher bar = higher AQI in this country)
-            </div>
-            {worst_bars_html}
+            {mini_bar_chart(worst_vals, labels)}
         </div>
         """,
         unsafe_allow_html=True,
     )
 
 with c3:
-    best_bars_html = mini_bar_chart(best_vals, labels)
     st.markdown(
         f"""
         <div class="kpi-card">
@@ -257,10 +241,7 @@ with c3:
             <div class="kpi-sub">
                 Index {best_row['risk_index']:.2f} ({best_row['risk_level']})
             </div>
-            <div class="section-caption" style="margin-top:0.6rem; font-size:0.75rem; color:#6B7280;">
-                Pollutant breakdown
-            </div>
-            {best_bars_html}
+            {mini_bar_chart(best_vals, labels)}
         </div>
         """,
         unsafe_allow_html=True,
@@ -305,6 +286,7 @@ with st.expander("Show full table"):
 
 st.markdown("</div>", unsafe_allow_html=True)
 
+
 # ---------------------------------------------------
 # 5. Interpretation
 # ---------------------------------------------------
@@ -314,11 +296,12 @@ st.markdown(
     """
 - **Risk Index 0–1:** 0 = cleanest, 1 = highest-risk  
 - **Normalised pollutants** allow fair country-to-country comparison  
-- **Risk levels** come from quartile cut-offs  
-- **Preset modes** simulate different health/science models  
+- **Risk levels** come from dataset quartiles  
+- **Preset modes** simulate different scientific models  
 """
 )
 st.markdown("</div>", unsafe_allow_html=True)
+
 
 
 
