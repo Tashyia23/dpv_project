@@ -2,60 +2,49 @@
 import pandas as pd
 import os
 
-DATA_DIR = "data/merged"
+RAW_DIR = "data/raw"
 
 def load_merged_dataset():
-    """Load the merged dataset (if exists)."""
-    merged_path = os.path.join(DATA_DIR, "merged_master.csv")
-
-    if not os.path.exists(merged_path):
-        return None  # Let loader.py build it
-
-    try:
-        df = pd.read_csv(merged_path)
-        return df
-    except Exception as e:
-        print("Error loading merged dataset:", e)
-        return None
-
-
-def build_master_dataset():
     """
-    Automatically scans data/merged/ for all CSV files and merges them.
+    Live merge of all CSV files in data/raw.
+    Returns a fully unified dataset for mapping.
     """
-    if not os.path.exists(DATA_DIR):
+
+    if not os.path.exists(RAW_DIR):
+        print("RAW_DIR not found:", RAW_DIR)
         return None
 
     csv_files = [
-        f for f in os.listdir(DATA_DIR)
-        if f.endswith(".csv") and "master" not in f
+        f for f in os.listdir(RAW_DIR)
+        if f.endswith(".csv")
     ]
 
     if not csv_files:
+        print("No CSV files in data/raw/")
         return None
 
     dfs = []
     for f in csv_files:
+        path = os.path.join(RAW_DIR, f)
         try:
-            df = pd.read_csv(os.path.join(DATA_DIR, f))
+            df = pd.read_csv(path)
+            df["source_file"] = f  # optional tracking
             dfs.append(df)
-        except:
-            pass
+        except Exception as e:
+            print("Error reading", f, ":", e)
 
     if not dfs:
         return None
 
-    # merge on common columns only
+    # Merge all files by common columns
     base = dfs[0]
     for df in dfs[1:]:
-        common = list(set(base.columns).intersection(set(df.columns)))
-        if not common:
-            continue
-        base = pd.merge(base, df, on=common, how="outer")
-
-    # Save master file
-    master_path = os.path.join(DATA_DIR, "merged_master.csv")
-    base.to_csv(master_path, index=False)
+        common_cols = list(set(base.columns) & set(df.columns))
+        if not common_cols:
+            # If no common columns → append (outer union)
+            base = pd.concat([base, df], ignore_index=True)
+        else:
+            # Outer merge on common fields
+            base = pd.merge(base, df, on=common_cols, how="outer")
 
     return base
-
