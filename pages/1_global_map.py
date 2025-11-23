@@ -1,14 +1,13 @@
 # import streamlit as st
 # import plotly.express as px
-# from utils.loader import load_base_data
+# from utils.merged_dataset import load_merged_dataset
 # from utils.ui import header
-#from utils.loader import load_master_data
 
 
 # st.set_page_config(layout="wide")
 
-# # base_df = load_base_data()
-# base_df = load_master_data()
+# df = load_merged_dataset()
+
 
 
 # header(
