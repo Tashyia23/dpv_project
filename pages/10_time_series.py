@@ -409,7 +409,7 @@ import plotly.express as px
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 
-from utils.merged_dataset import load_master_dataset
+from utils.merged_dataset import load_merged_dataset
 from utils.ui import header
 
 st.set_page_config(layout="wide")
@@ -417,7 +417,7 @@ st.set_page_config(layout="wide")
 # ---------------------------------------------------------
 # 1. Load merged global dataset (MASTER)
 # ---------------------------------------------------------
-df = load_master_dataset()
+df = load_merged_dataset()
 
 header(
     "📈 Time-Series Explorer",
