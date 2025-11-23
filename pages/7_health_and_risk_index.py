@@ -187,49 +187,56 @@ agg_df["risk_level"] = agg_df["risk_index"].apply(classify_risk)
 # ---------------------------------------------------
 # 3. Global KPIs
 # ---------------------------------------------------
+# ---------------------------------------------------
+# 2. Global risk overview (Improved UI)
+# ---------------------------------------------------
 st.markdown("<div class='chart-card'>", unsafe_allow_html=True)
-st.markdown("#### 2. Global risk overview")
+
+st.markdown("""
+<div style='font-size: 20px; font-weight: 700; margin-bottom: 10px;'>
+    🌍 2. Global Risk Overview
+</div>
+""", unsafe_allow_html=True)
 
 avg_risk = agg_df["risk_index"].mean()
 worst_row = agg_df.loc[agg_df["risk_index"].idxmax()]
 best_row = agg_df.loc[agg_df["risk_index"].idxmin()]
 
-k1, k2, k3 = st.columns(3)
-with k1:
-    st.markdown(
-        f"""
-        <div class="kpi-card">
-            <div class="kpi-label">Global average risk</div>
-            <div class="kpi-value">{avg_risk:.2f}</div>
-            <div class="kpi-sub">Scaled index (0–1)</div>
-        </div>
-        """,
-        unsafe_allow_html=True,
-    )
-with k2:
-    st.markdown(
-        f"""
-        <div class="kpi-card">
-            <div class="kpi-label">Highest risk</div>
-            <div class="kpi-value">{worst_row['country']}</div>
-            <div class="kpi-sub">Index {worst_row['risk_index']:.2f} ({worst_row['risk_level']})</div>
-        </div>
-        """,
-        unsafe_allow_html=True,
-    )
-with k3:
-    st.markdown(
-        f"""
-        <div class="kpi-card">
-            <div class="kpi-label">Lowest risk</div>
-            <div class="kpi-value">{best_row['country']}</div>
-            <div class="kpi-sub">Index {best_row['risk_index']:.2f} ({best_row['risk_level']})</div>
-        </div>
-        """,
-        unsafe_allow_html=True,
-    )
+# 3 KPI cards
+kpi1, kpi2, kpi3 = st.columns(3)
+
+# ---- Global Average Risk ----
+with kpi1:
+    st.markdown("""
+    <div class="kpi-card" style="text-align: center;">
+        <div class="kpi-label">🌐 Global Average Risk</div>
+        <div class="kpi-value" style="font-size: 1.6rem;">{:.2f}</div>
+        <div class="kpi-sub">Scaled index (0–1)</div>
+    </div>
+    """.format(avg_risk), unsafe_allow_html=True)
+
+# ---- Highest Risk Country ----
+with kpi2:
+    st.markdown(f"""
+    <div class="kpi-card" style="text-align: center; border-left: 5px solid #ef4444;">
+        <div class="kpi-label">🔥 Highest Risk Country</div>
+        <div class="kpi-value" style="font-size: 1.4rem;">{worst_row['country']}</div>
+        <div class="kpi-sub">Index {worst_row['risk_index']:.2f} ({worst_row['risk_level']})</div>
+    </div>
+    """, unsafe_allow_html=True)
+
+# ---- Lowest Risk Country ----
+with kpi3:
+    st.markdown(f"""
+    <div class="kpi-card" style="text-align: center; border-left: 5px solid #22c55e;">
+        <div class="kpi-label">🍃 Lowest Risk Country</div>
+        <div class="kpi-value" style="font-size: 1.4rem;">{best_row['country']}</div>
+        <div class="kpi-sub">Index {best_row['risk_index']:.2f} ({best_row['risk_level']})</div>
+    </div>
+    """, unsafe_allow_html=True)
 
 st.markdown("</div>", unsafe_allow_html=True)
+
 
 # ---------------------------------------------------
 # 4. Bar chart
