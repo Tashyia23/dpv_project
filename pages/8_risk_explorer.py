@@ -3,6 +3,7 @@ import pandas as pd
 import numpy as np
 import plotly.express as px
 import plotly.graph_objects as go
+from utils.loader import load_master_data
 from utils.loader import load_base_data
 from utils.ui import header
 from utils.regions import assign_region
@@ -12,7 +13,9 @@ st.set_page_config(layout="wide")
 # ---------------------------------------------
 # Load data
 # ---------------------------------------------
-df = load_base_data()
+# df = load_base_data()
+df = load_master_data()
+
 
 if "country" not in df.columns:
     st.error("Dataset must contain 'country' column.")
