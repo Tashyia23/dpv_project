@@ -400,6 +400,8 @@
 
 #______________________________________________
 
+# pages/10_time_series.py
+
 import streamlit as st
 import pandas as pd
 import numpy as np
@@ -407,7 +409,7 @@ import plotly.express as px
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 
-from utils.data_loader import load_master_data
+from utils.merged_datasets import load_master_dataset
 from utils.ui import header
 
 st.set_page_config(layout="wide")
@@ -419,7 +421,7 @@ df = load_master_dataset()
 
 header(
     "📈 Time-Series Explorer",
-    "How pollution levels evolve over time by country and region."
+    "How pollution levels evolve over time by country and region (before vs after processing)."
 )
 
 if df is None or df.empty:
@@ -466,11 +468,10 @@ if "region" not in df.columns:
         from utils.regions import assign_region
         df["region"] = df["country"].apply(assign_region)
     except Exception:
-        # if mapping module not available, still allow non-regional modes
         df["region"] = np.nan
 
 # ---------------------------------------------------------
-# 5. Detect pollutant columns automatically
+# 5. Detect pollutant columns automatically (raw concentrations)
 # ---------------------------------------------------------
 def find_first_existing_column(candidates):
     for c in candidates:
@@ -478,13 +479,13 @@ def find_first_existing_column(candidates):
             return c
     return None
 
-pollutant_meta = {}
+pollutant_meta: dict[str, dict] = {}
 
 # PM2.5
 pm25_col = find_first_existing_column([
     "pm25", "pm25_concentration", "pm25_mean",
     "PM2.5", "PM₂․₅",
-    "Concentrations of fine particulate matter (PM2.5) - Residence area type: Total"
+    "Concentrations of fine particulate matter (PM2.5) - Residence area type: Total",
 ])
 if pm25_col:
     pollutant_meta["PM₂.₅ (Fine Particles)"] = {
@@ -495,7 +496,7 @@ if pm25_col:
 
 # PM10
 pm10_col = find_first_existing_column([
-    "pm10", "PM10", "pm10_concentration"
+    "pm10", "PM10", "pm10_concentration",
 ])
 if pm10_col:
     pollutant_meta["PM₁₀ (Coarse Particles)"] = {
@@ -506,7 +507,7 @@ if pm10_col:
 
 # NO2
 no2_col = find_first_existing_column([
-    "no2", "NO2", "no2_mean", "no2_concentration"
+    "no2", "NO2", "no2_mean", "no2_concentration",
 ])
 if no2_col:
     pollutant_meta["NO₂ (Nitrogen Dioxide)"] = {
@@ -517,7 +518,7 @@ if no2_col:
 
 # Ozone
 o3_col = find_first_existing_column([
-    "o3", "O3", "ozone", "ozone_mean", "ozone_concentration"
+    "o3", "O3", "ozone", "ozone_mean", "ozone_concentration",
 ])
 if o3_col:
     pollutant_meta["O₃ (Ozone)"] = {
@@ -528,7 +529,7 @@ if o3_col:
 
 # CO
 co_col = find_first_existing_column([
-    "co", "CO", "co_mean", "co_concentration"
+    "co", "CO", "co_mean", "co_concentration",
 ])
 if co_col:
     pollutant_meta["CO (Carbon Monoxide)"] = {
@@ -542,10 +543,10 @@ if not pollutant_meta:
     st.stop()
 
 # ---------------------------------------------------------
-# 6. Compute risk index for time-series (0–1, equal weights)
+# 6. Compute risk index for time series (0–1, equal weights)
 # ---------------------------------------------------------
 pollutant_cols = [meta["column"] for meta in pollutant_meta.values()]
-scaled = {}
+scaled: dict[str, np.ndarray] = {}
 
 for col in pollutant_cols:
     if col not in df.columns:
@@ -568,25 +569,46 @@ else:
     df["risk_index_ts"] = np.nan
 
 # ---------------------------------------------------------
-# 7. Sidebar Controls
+# 7. BEFORE / AFTER TOGGLE (main view)
+# ---------------------------------------------------------
+data_mode = st.radio(
+    "Data View:",
+    [
+        "Before Processing (Raw Concentrations)",
+        "After Processing (Normalised Risk Index)",
+    ],
+    horizontal=True,
+)
+
+st.caption(
+    "• **Before**: plots original pollutant levels over time (optionally with risk index overlay).  \n"
+    "• **After**: plots the **composite risk index (0–1)** over time, with a selected pollutant on the secondary axis."
+)
+
+# ---------------------------------------------------------
+# 8. Sidebar Controls
 # ---------------------------------------------------------
 st.sidebar.header("🔎 Time-Series Controls")
 
 view_mode = st.sidebar.radio(
     "View mode:",
-    ["Global Trend", "Single Country", "Compare Countries", "Regional Trend"]
+    ["Global Trend", "Single Country", "Compare Countries", "Regional Trend"],
 )
 
-pollutant_label = st.sidebar.selectbox(
-    "Pollutant:",
-    list(pollutant_meta.keys())
-)
+pollutant_label = st.sidebar.selectbox("Pollutant:", list(pollutant_meta.keys()))
 pollutant_info = pollutant_meta[pollutant_label]
 value_col = pollutant_info["column"]
 unit = pollutant_info["unit"]
 line_color = pollutant_info["color"]
 
-show_risk = st.sidebar.checkbox("Show risk index on secondary axis", value=True)
+# In BEFORE mode, default to showing risk overlay; in AFTER mode, default to showing pollutant overlay
+default_show_risk = True
+if data_mode.startswith("After"):
+    default_show_risk = True  # we want both risk + pollutant
+
+show_secondary = st.sidebar.checkbox(
+    "Show secondary series (risk / pollutant)", value=default_show_risk
+)
 
 # Optional global year filter
 min_year, max_year = int(df["year"].min()), int(df["year"].max())
@@ -600,7 +622,7 @@ year_range = st.sidebar.slider(
 df = df[(df["year"] >= year_range[0]) & (df["year"] <= year_range[1])]
 
 # ---------------------------------------------------------
-# 8. Helper: dual-axis time-series
+# 9. Helper: dual-axis time-series
 # ---------------------------------------------------------
 def dual_axis_time_series(
     data: pd.DataFrame,
@@ -609,70 +631,98 @@ def dual_axis_time_series(
     group_by: str | None = None,
 ):
     """
-    If group_by is None: single line.
-    If group_by is not None: multiple lines on primary axis (one per group),
-    and a single averaged risk_index_ts on secondary axis.
+    - BEFORE mode:
+        primary  = pollutant (value_col), secondary = risk_index_ts (if enabled)
+    - AFTER mode:
+        primary  = risk_index_ts, secondary = pollutant (value_col, if enabled)
     """
     fig = make_subplots(specs=[[{"secondary_y": True}]])
 
-    if group_by is None:
-        series = data.sort_values("year")
+    # Decide which is primary vs secondary based on data_mode
+    if data_mode.startswith("Before"):
+        primary_col = value_col
+        primary_name = pollutant_label
+        primary_unit = unit
+        primary_color = color
 
-        fig.add_trace(
-            go.Scatter(
-                x=series["year"],
-                y=series[value_col],
-                mode="lines+markers",
-                name=pollutant_label,
-                line=dict(color=color),
-            ),
-            secondary_y=False,
-        )
+        secondary_col = "risk_index_ts" if show_secondary and "risk_index_ts" in data.columns else None
+        secondary_name = "Risk Index"
+        secondary_color = "#EF4444"
+        secondary_unit = "0–1"
+    else:
+        primary_col = "risk_index_ts"
+        primary_name = "Risk Index"
+        primary_unit = "0–1"
+        primary_color = "#EF4444"
 
-        if show_risk and "risk_index_ts" in series.columns:
+        secondary_col = value_col if show_secondary and value_col in data.columns else None
+        secondary_name = pollutant_label
+        secondary_color = color
+        secondary_unit = unit
+
+    # Helper to add a line (optionally grouped)
+    def add_primary_traces(group_col: str | None):
+        if group_col is None:
+            series = data.sort_values("year")
             fig.add_trace(
                 go.Scatter(
                     x=series["year"],
-                    y=series["risk_index_ts"],
+                    y=series[primary_col],
                     mode="lines+markers",
-                    name="Risk Index",
-                    line=dict(color="#EF4444", dash="dash"),
-                ),
-                secondary_y=True,
-            )
-
-    else:
-        for g, subset in data.groupby(group_by):
-            subset = subset.sort_values("year")
-            fig.add_trace(
-                go.Scatter(
-                    x=subset["year"],
-                    y=subset[value_col],
-                    mode="lines+markers",
-                    name=str(g),
+                    name=primary_name,
+                    line=dict(color=primary_color),
                 ),
                 secondary_y=False,
             )
+        else:
+            for g, subset in data.groupby(group_col):
+                subset = subset.sort_values("year")
+                fig.add_trace(
+                    go.Scatter(
+                        x=subset["year"],
+                        y=subset[primary_col],
+                        mode="lines+markers",
+                        name=str(g),
+                    ),
+                    secondary_y=False,
+                )
 
-        if show_risk and "risk_index_ts" in data.columns:
-            risk_df = (
-                data.groupby("year")["risk_index_ts"]
+    # Primary series
+    add_primary_traces(group_by)
+
+    # Secondary series (aggregated across groups if necessary)
+    if secondary_col is not None:
+        if group_by is None:
+            s = data.sort_values("year")
+            fig.add_trace(
+                go.Scatter(
+                    x=s["year"],
+                    y=s[secondary_col],
+                    mode="lines+markers",
+                    name=secondary_name,
+                    line=dict(color=secondary_color, dash="dash"),
+                ),
+                secondary_y=True,
+            )
+        else:
+            sec_df = (
+                data.groupby("year")[secondary_col]
                 .mean()
                 .reset_index()
                 .sort_values("year")
             )
             fig.add_trace(
                 go.Scatter(
-                    x=risk_df["year"],
-                    y=risk_df["risk_index_ts"],
+                    x=sec_df["year"],
+                    y=sec_df[secondary_col],
                     mode="lines",
-                    name="Avg Risk Index",
-                    line=dict(color="#EF4444", width=2, dash="dash"),
+                    name=f"Avg {secondary_name}",
+                    line=dict(color=secondary_color, width=2, dash="dash"),
                 ),
                 secondary_y=True,
             )
 
-    title = f"{title_prefix} {pollutant_label} Trend Over Time".strip()
+    title = f"{title_prefix} {primary_name} Trend Over Time".strip()
     fig.update_layout(
         title=title,
         margin=dict(l=40, r=40, t=60, b=40),
@@ -680,31 +730,36 @@ def dual_axis_time_series(
     )
     fig.update_xaxes(title_text="Year")
     fig.update_yaxes(
-        title_text=f"{pollutant_label} ({unit})",
+        title_text=f"{primary_name} ({primary_unit})",
         secondary_y=False,
     )
-    if show_risk:
+    if secondary_col is not None:
         fig.update_yaxes(
-            title_text="Risk Index (0–1)",
+            title_text=f"{secondary_name} ({secondary_unit})",
             secondary_y=True,
         )
 
     return fig
 
 # ---------------------------------------------------------
-# 9. VIEW MODES
+# 10. VIEW MODES
 # ---------------------------------------------------------
 
 # ---------- GLOBAL TREND ----------
 if view_mode == "Global Trend":
-    st.subheader(f"🌍 Global {pollutant_label} Trend Over Time")
+    main_label = "Risk Index" if data_mode.startswith("After") else pollutant_label
+    st.subheader(f"🌍 Global {main_label} Trend Over Time")
+
+    agg_cols = ["risk_index_ts", value_col]
+    existing_cols = [c for c in agg_cols if c in df.columns]
 
     global_df = (
-        df.groupby("year")[[value_col, "risk_index_ts"]]
+        df.groupby("year")[existing_cols]
         .mean()
         .reset_index()
         .sort_values("year")
     )
+
     fig = dual_axis_time_series(
         global_df,
         title_prefix="Global",
@@ -712,15 +767,23 @@ if view_mode == "Global Trend":
     )
     st.plotly_chart(fig, use_container_width=True)
 
-    summary = global_df[["year", value_col]].rename(
-        columns={value_col: "mean_level"}
+    if data_mode.startswith("After"):
+        summary_col = "risk_index_ts"
+        summary_title = "Mean Risk Index"
+    else:
+        summary_col = value_col
+        summary_title = f"Mean {pollutant_label}"
+
+    summary = global_df[["year", summary_col]].rename(
+        columns={summary_col: "mean_level"}
     )
-    st.markdown("### 📊 Summary Statistics (Global)")
+    st.markdown(f"### 📊 Summary Statistics (Global — {summary_title})")
     st.dataframe(summary, use_container_width=True)
 
 # ---------- SINGLE COUNTRY ----------
 elif view_mode == "Single Country":
-    st.subheader(f"🇺🇳 Single Country — {pollutant_label} Over Time")
+    main_label = "Risk Index" if data_mode.startswith("After") else pollutant_label
+    st.subheader(f"🇺🇳 Single Country — {main_label} Over Time")
 
     countries = sorted(df["country"].unique())
     country = st.selectbox("Select a country:", countries)
@@ -734,8 +797,13 @@ elif view_mode == "Single Country":
     )
     st.plotly_chart(fig, use_container_width=True)
 
+    if data_mode.startswith("After"):
+        summary_col = "risk_index_ts"
+    else:
+        summary_col = value_col
+
     summary = (
-        cdf.groupby("year")[value_col]
+        cdf.groupby("year")[summary_col]
         .agg(mean_level="mean", min_level="min", max_level="max")
         .reset_index()
     )
@@ -744,7 +812,8 @@ elif view_mode == "Single Country":
 
 # ---------- COMPARE COUNTRIES ----------
 elif view_mode == "Compare Countries":
-    st.subheader(f"🌐 Compare Countries — {pollutant_label}")
+    main_label = "Risk Index" if data_mode.startswith("After") else pollutant_label
+    st.subheader(f"🌐 Compare Countries — {main_label}")
 
     countries = sorted(df["country"].unique())
     default_selection = [c for c in ["Afghanistan", "India", "China"] if c in countries]
@@ -767,11 +836,16 @@ elif view_mode == "Compare Countries":
         )
         st.plotly_chart(fig, use_container_width=True)
 
+        if data_mode.startswith("After"):
+            summary_col = "risk_index_ts"
+        else:
+            summary_col = value_col
+
         summary = (
-            comp_df.groupby(["country", "year"])[value_col]
+            comp_df.groupby(["country", "year"])[summary_col]
             .mean()
             .reset_index()
-            .rename(columns={value_col: "mean_level"})
+            .rename(columns={summary_col: "mean_level"})
         )
         st.markdown("### 📊 Summary by Country & Year")
         st.dataframe(summary, use_container_width=True)
@@ -781,7 +855,8 @@ elif view_mode == "Regional Trend":
     if "region" not in df.columns or df["region"].isna().all():
         st.warning("No valid 'region' data found in dataset, so regional view is disabled.")
     else:
-        st.subheader(f"🌎 Regional {pollutant_label} Trends")
+        main_label = "Risk Index" if data_mode.startswith("After") else pollutant_label
+        st.subheader(f"🌎 Regional {main_label} Trends")
 
         all_regions = sorted(df["region"].dropna().unique())
         selected_regions = st.multiselect(
@@ -802,11 +877,17 @@ elif view_mode == "Regional Trend":
             )
             st.plotly_chart(fig, use_container_width=True)
 
+            if data_mode.startswith("After"):
+                summary_col = "risk_index_ts"
+            else:
+                summary_col = value_col
+
             summary = (
-                rdf.groupby(["region", "year"])[value_col]
+                rdf.groupby(["region", "year"])[summary_col]
                 .mean()
                 .reset_index()
-                .rename(columns={value_col: "mean_level"})
+                .rename(columns={summary_col: "mean_level"})
             )
             st.markdown("### 📊 Summary by Region & Year")
             st.dataframe(summary, use_container_width=True)
+
