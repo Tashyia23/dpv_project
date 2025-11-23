@@ -7,7 +7,6 @@ from utils.ui import header
 
 st.set_page_config(layout="wide")
 
-
 # ---------------------------------------------------
 # Mini horizontal bar chart (Option B)
 # ---------------------------------------------------
@@ -198,16 +197,22 @@ agg_df["risk_level"] = agg_df["risk_index"].apply(classify)
 # ---------------------------------------------------
 # 3. KPI Overview with Mini Bars
 # ---------------------------------------------------
+
 st.markdown("<div class='chart-card'>", unsafe_allow_html=True)
 st.markdown("### 🌍 Global Pollution Risk Overview")
+st.caption(
+    "The risk index combines normalised pollutant AQI values. "
+    "Mini bars show which pollutants contribute most in each country."
+)
 
 avg_risk = agg_df["risk_index"].mean()
 worst_row = agg_df.loc[agg_df["risk_index"].idxmax()]
 best_row = agg_df.loc[agg_df["risk_index"].idxmin()]
 
+# Use the same order as selected_pollutants
 labels = [pollutant_info[c][1] for c in selected_pollutants]
-worst_vals = [worst_row[c] for c in selected_pollutants]
-best_vals = [best_row[c] for c in selected_pollutants]
+worst_vals = [float(worst_row[c]) for c in selected_pollutants]
+best_vals = [float(best_row[c]) for c in selected_pollutants]
 
 c1, c2, c3 = st.columns(3)
 
@@ -217,39 +222,52 @@ with c1:
         <div class="kpi-card">
             <div class="kpi-label">Global Average Risk</div>
             <div class="kpi-value">{avg_risk:.2f}</div>
-            <div class="kpi-sub">Scaled Index (0–1)</div>
+            <div class="kpi-sub">Scaled index (0–1)</div>
         </div>
         """,
         unsafe_allow_html=True,
     )
 
 with c2:
+    worst_bars_html = mini_bar_chart(worst_vals, labels)
     st.markdown(
         f"""
         <div class="kpi-card">
             <div class="kpi-label">Highest Risk Country</div>
             <div class="kpi-value">{worst_row['country']}</div>
-            <div class="kpi-sub">Index {worst_row['risk_index']:.2f} ({worst_row['risk_level']})</div>
-            <div style="margin-top:10px;">{mini_bar_chart(worst_vals, labels)}</div>
+            <div class="kpi-sub">
+                Index {worst_row['risk_index']:.2f} ({worst_row['risk_level']})
+            </div>
+            <div class="section-caption" style="margin-top:0.6rem; font-size:0.75rem; color:#6B7280;">
+                Pollutant breakdown (higher bar = higher AQI in this country)
+            </div>
+            {worst_bars_html}
         </div>
         """,
         unsafe_allow_html=True,
     )
 
 with c3:
+    best_bars_html = mini_bar_chart(best_vals, labels)
     st.markdown(
         f"""
         <div class="kpi-card">
             <div class="kpi-label">Lowest Risk Country</div>
             <div class="kpi-value">{best_row['country']}</div>
-            <div class="kpi-sub">Index {best_row['risk_index']:.2f} ({best_row['risk_level']})</div>
-            <div style="margin-top:10px;">{mini_bar_chart(best_vals, labels)}</div>
+            <div class="kpi-sub">
+                Index {best_row['risk_index']:.2f} ({best_row['risk_level']})
+            </div>
+            <div class="section-caption" style="margin-top:0.6rem; font-size:0.75rem; color:#6B7280;">
+                Pollutant breakdown
+            </div>
+            {best_bars_html}
         </div>
         """,
         unsafe_allow_html=True,
     )
 
 st.markdown("</div>", unsafe_allow_html=True)
+
 
 # ---------------------------------------------------
 # 4. Country Ranking Chart
