@@ -2,9 +2,6 @@
 
 from typing import Dict, Set
 
-# -------------------------------
-# 1. Region Groups (by country)
-# -------------------------------
 REGION_MAP: Dict[str, Set[str]] = {
     "Asia": {
         "Afghanistan", "Armenia", "Azerbaijan", "Bahrain", "Bangladesh", "Bhutan",
@@ -67,8 +64,11 @@ REGION_MAP: Dict[str, Set[str]] = {
 }
 
 def assign_region(country: str):
-    return REGION_MAP.get(country, "Other")
-
+    """Return region name based on country."""
+    for region, countries in REGION_MAP.items():
+        if country in countries:
+            return region
+    return "Other"
 
 REGION_COLORS = {
     "North America": "#2563eb",
@@ -79,5 +79,6 @@ REGION_COLORS = {
     "Oceania": "#e11d48",
     "Other": "#6b7280",
 }
+
 
 
