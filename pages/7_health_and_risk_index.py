@@ -25,63 +25,60 @@ if "country" not in df.columns:
 # 1. Choose pollutants and build a risk score
 # ---------------------------------------------------
 st.markdown("<div class='chart-card'>", unsafe_allow_html=True)
-st.markdown("#### 1. Configure risk score")
+st.markdown("### 1. Configure Risk Score")
 
-# Try to detect pollutant columns
-candidate_cols = []
-for col in df.columns:
-    if col.endswith("_aqi_value") or col in ["aqi_value"]:
-        candidate_cols.append(col)
+st.markdown(
+    """
+    Select which pollutants are included in the health risk index.
+    All selected pollutants are **equally weighted** by default.
+    
+    If you want to customise weights, turn on **Advanced Mode**.
+    """
+)
 
-if not candidate_cols:
-    st.warning("No pollutant AQI columns detected. Using all numeric columns as fallback.")
-    candidate_cols = df.select_dtypes(include="number").columns.tolist()
+# Pollutant options
+pollutant_options = [c for c in df.columns if c.endswith("_aqi_value")]
 
-# Let user choose which pollutants contribute to risk
 selected_pollutants = st.multiselect(
-    "Choose pollutant metrics to include in the risk index",
-    options=candidate_cols,
-    default=[c for c in candidate_cols if c != "aqi_value"] or candidate_cols,
-    help="These should be AQI-based columns such as pm25_aqi_value, no2_aqi_value, ozone_aqi_value, etc.",
+    "Pollutants to include",
+    pollutant_options,
+    default=pollutant_options,  # everything selected
 )
 
 if not selected_pollutants:
-    st.warning("Please select at least one pollutant metric.")
-    st.markdown("</div>", unsafe_allow_html=True)
+    st.warning("Please select at least one pollutant.")
     st.stop()
 
-# Weighting scheme
-st.markdown(
-    "<div class='section-caption'>Assign weights to each pollutant (they will be normalised to sum to 1).</div>",
-    unsafe_allow_html=True,
-)
+# -----------------------------------------------------------
+# Advanced mode toggle
+# -----------------------------------------------------------
+advanced = st.toggle("🔧 Advanced Mode (custom weights)", value=False)
 
-weights = {}
-total_weight = 0.0
-for col in selected_pollutants:
-    w = st.number_input(
-        f"Weight for {col}",
-        min_value=0.0,
-        max_value=10.0,
-        value=1.0,
-        step=0.1,
-        key=f"w_{col}",
-    )
-    weights[col] = w
-    total_weight += w
+if advanced:
+    st.caption("Adjust the weight of each pollutant. Weights will be normalised automatically.")
+    weights = {}
+    total_weight = 0.0
 
-if total_weight == 0:
-    # Avoid division by zero
-    norm_weights = {c: 1 / len(selected_pollutants) for c in selected_pollutants}
+    for col in selected_pollutants:
+        w = st.slider(
+            f"Weight for {col}",
+            min_value=0.0, max_value=10.0,
+            value=1.0, step=0.1
+        )
+        weights[col] = w
+        total_weight += w
+
+    if total_weight == 0:
+        norm_weights = {c: 1 / len(selected_pollutants) for c in selected_pollutants}
+    else:
+        norm_weights = {c: w / total_weight for c, w in weights.items()}
+
 else:
-    norm_weights = {c: w / total_weight for c, w in weights.items()}
-
-st.caption(
-    "Weights are automatically normalised so that they sum to 1. "
-    "This risk index is a weighted combination of the selected pollutant AQI values."
-)
+    # Simple equal weights
+    norm_weights = {c: 1 / len(selected_pollutants) for c in selected_pollutants}
 
 st.markdown("</div>", unsafe_allow_html=True)
+
 
 # ---------------------------------------------------
 # 2. Compute country-level risk index
