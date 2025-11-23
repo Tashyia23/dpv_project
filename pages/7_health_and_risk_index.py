@@ -8,29 +8,57 @@ from utils.ui import header
 st.set_page_config(layout="wide")
 
 # ---------------------------------------------------
-# Mini Bar Chart (fixed)
+# Mini Bar Chart 
 # ---------------------------------------------------
-def mini_bar_chart(values, labels, max_width=130, height=6, colors=None):
-
+def mini_bar_chart(values, labels, max_width=160, height=8, colors=None):
+    """
+    Modern mini horizontal bar chart using CSS.
+    Clean layout, consistent spacing, colour coded.
+    """
     if colors is None:
-        colors = ["#8B5CF6", "#0EA5E9", "#F59E0B", "#EF4444", "#10B981"]
+        colors = ["#7C3AED", "#0EA5E9", "#F59E0B", "#EF4444", "#10B981"]
 
+    values = list(values)
+    labels = list(labels)
     max_val = max(values) if max(values) > 0 else 1
 
-    html = "<div>"
+    rows = []
     for i, v in enumerate(values):
         bar_width = int((v / max_val) * max_width)
-        html += (
-            f"<div style='display:flex; align-items:center; margin-bottom:4px;'>"
-            f"<div style='width:150px; font-size:0.75rem; color:#374151;'>{labels[i]}</div>"
-            f"<div style='background:{colors[i % len(colors)]}; height:{height}px; width:{bar_width}px; "
-            f"border-radius:4px; margin-right:6px;'></div>"
-            f"<div style='font-size:0.70rem; color:#6B7280;'>{v:.2f}</div>"
-            "</div>"
-        )
-    html += "</div>"
+        color = colors[i % len(colors)]
 
-    return html
+        rows.append(f"""
+        <div style="display:flex; align-items:center; margin-bottom:6px;">
+
+            <div style="width:150px; 
+                        font-size:0.80rem; 
+                        font-weight:500; 
+                        color:#374151;">
+                {labels[i]}
+            </div>
+
+            <div style="flex-grow:1; max-width:{max_width}px; 
+                        background:#E5E7EB; 
+                        border-radius:4px;
+                        height:{height}px; 
+                        margin-right:8px;">
+                <div style="background:{color};
+                            width:{bar_width}px; 
+                            height:{height}px; 
+                            border-radius:4px;">
+                </div>
+            </div>
+
+            <div style="width:45px; 
+                        text-align:right; 
+                        font-size:0.80rem; 
+                        color:#374151;">
+                {v:.2f}
+            </div>
+        </div>
+        """)
+
+    return "<div style='margin-top:8px;'>" + "".join(rows) + "</div>"
 
 
 # ---------------------------------------------------
