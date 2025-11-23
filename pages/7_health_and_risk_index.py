@@ -7,24 +7,22 @@ from utils.ui import header
 
 st.set_page_config(layout="wide")
 
-# ---------------------------------------------------
-# Mini horizontal bar generator (safe, SVG-free)
-# ---------------------------------------------------
 
+# ---------------------------------------------------
+# Mini horizontal bar chart (Option B)
+# ---------------------------------------------------
 def mini_bar_chart(values, labels, max_width=130, height=6, colors=None):
     """
-    Creates small horizontal bars using CSS.
-    Bars are correctly scaled relative to max(values),
-    maintaining pollutant order.
+    Mini horizontal bars using pure CSS (Streamlit-safe).
+    Bars scale correctly relative to max(values) 
+    and maintain pollutant order.
     """
     if colors is None:
         colors = ["#8B5CF6", "#0EA5E9", "#F59E0B", "#EF4444", "#10B981"]
 
-    # ensure correct ordering
     values = list(values)
     labels = list(labels)
 
-    # correctly compute max
     max_val = max(values) if max(values) > 0 else 1
 
     rows = []
@@ -35,7 +33,7 @@ def mini_bar_chart(values, labels, max_width=130, height=6, colors=None):
         rows.append(
             f"""
             <div style="display:flex; align-items:center; margin-bottom:4px;">
-                <div style="width:120px; font-size:0.75rem; color:#374151;">
+                <div style="width:150px; font-size:0.75rem; color:#374151; white-space:nowrap;">
                     {labels[i]}
                 </div>
                 <div style="background:{color};
@@ -44,15 +42,18 @@ def mini_bar_chart(values, labels, max_width=130, height=6, colors=None):
                             border-radius:4px;
                             margin-right:6px;">
                 </div>
-                <div style="font-size:0.7rem; color:#6B7280;">{v:.2f}</div>
+                <div style="font-size:0.70rem; color:#6B7280;">
+                    {v:.2f}
+                </div>
             </div>
             """
         )
 
     return "<div>" + "".join(rows) + "</div>"
 
+
 # ---------------------------------------------------
-# Load data
+# Load Data
 # ---------------------------------------------------
 df = load_base_data()
 
@@ -62,26 +63,25 @@ header(
 )
 
 if "country" not in df.columns:
-    st.error("The base dataset is missing a 'country' column.")
+    st.error("Dataset missing required column: 'country'")
     st.stop()
 
-# -----------------------------------------------------------
-# 1. Configure Risk Score 
-# -----------------------------------------------------------
-
+# ---------------------------------------------------
+# 1. Configure Risk Score
+# ---------------------------------------------------
 st.markdown("<div class='chart-card'>", unsafe_allow_html=True)
 st.markdown("### 1. Configure Risk Score")
 
 st.markdown(
     """
-    Select pollutants for the **Pollution Health Risk Index**.
-    Use **WHO/EPA presets** or tune manually in **Expert Mode**.
+    Choose pollutants to include in the **Pollution Health Risk Index**.
+
+    - **Beginner Mode:** equal weights  
+    - **WHO Mode:** prioritises health harm  
+    - **EPA Mode:** prioritises regulatory danger  
+    - **Expert Mode:** manually adjust weights  
     """
 )
-
-# -----------------------------------------------------------
-# Pollutant icons + display labels
-# -----------------------------------------------------------
 
 pollutant_info = {
     "pm25_aqi_value": ("🟤", "PM2.5 (Fine Particles)"),
@@ -102,16 +102,16 @@ selected_pollutants = st.multiselect(
     "Pollutants to include",
     pollutant_options,
     default=pollutant_options,
-    format_func=lambda col: pretty_labels.get(col, col),
+    format_func=lambda col: pretty_labels[col],
 )
 
 if not selected_pollutants:
     st.warning("Please select at least one pollutant.")
     st.stop()
 
-# -----------------------------------------------------------
-# Preset profiles (Beginner / WHO / EPA / Expert)
-# -----------------------------------------------------------
+# ---------------------------------------------------
+# Weight Presets
+# ---------------------------------------------------
 st.markdown("#### 🔧 Select a preset (optional)")
 
 preset = st.radio(
@@ -119,7 +119,6 @@ preset = st.radio(
     ["Beginner Mode (equal weights)", "WHO Health Severity", "EPA Danger Scale", "Expert Mode"],
 )
 
-# Default equal weights
 equal_weights = {c: 1 / len(selected_pollutants) for c in selected_pollutants}
 
 who_weights = {
@@ -138,7 +137,7 @@ epa_weights = {
     "co_aqi_value": 0.10,
 }
 
-# Override weights based on preset
+# Compute final weights
 if preset == "Beginner Mode (equal weights)":
     norm_weights = equal_weights
 
@@ -151,56 +150,54 @@ elif preset == "EPA Danger Scale":
     norm_weights = {c: epa_weights[c] / total for c in selected_pollutants}
 
 else:
-    # Expert mode sliders
-    st.markdown("#### ⚙ Expert Mode – Fine-tune pollutant weighting")
+    st.markdown("#### ⚙ Expert Mode – Fine Tune Pollutant Weights")
     weights = {}
-    total_weight = 0
-
+    total_w = 0
     for col in selected_pollutants:
         w = st.slider(
             f"Weight for {pretty_labels[col]}",
             0.0, 10.0, 1.0, 0.1, key=f"w_{col}"
         )
         weights[col] = w
-        total_weight += w
-    
+        total_w += w
+
     norm_weights = (
-        equal_weights if total_weight == 0
-        else {c: w / total_weight for c, w in weights.items()}
+        equal_weights if total_w == 0
+        else {c: weights[c] / total_w for c in selected_pollutants}
     )
 
 st.markdown("</div>", unsafe_allow_html=True)
 
 # ---------------------------------------------------
-# 2. Compute risk index
+# 2. Compute Risk Index
 # ---------------------------------------------------
-
 agg_df = df[["country"] + selected_pollutants].groupby("country").mean().reset_index()
 
+# Min-max scaling
 scaled = {}
 for col in selected_pollutants:
     series = agg_df[col].astype(float)
-    col_min, col_max = series.min(), series.max()
-    scaled[col] = (series - col_min) / (col_max - col_min) if col_max > col_min else np.zeros_like(series)
+    lo, hi = series.min(), series.max()
+    scaled[col] = (series - lo) / (hi - lo) if hi > lo else np.zeros_like(series)
 
 scaled_df = pd.DataFrame(scaled)
 
-agg_df["risk_index"] = sum(scaled_df[col] * norm_weights[col] for col in selected_pollutants)
+agg_df["risk_index"] = sum(scaled_df[c] * norm_weights[c] for c in selected_pollutants)
 
+# Classification
 q1, q2, q3 = np.percentile(agg_df["risk_index"], [25, 50, 75])
 
-def classify_risk(r):
+def classify(r):
     if r <= q1: return "Low"
-    elif r <= q2: return "Moderate"
-    elif r <= q3: return "High"
+    if r <= q2: return "Moderate"
+    if r <= q3: return "High"
     return "Very High"
 
-agg_df["risk_level"] = agg_df["risk_index"].apply(classify_risk)
+agg_df["risk_level"] = agg_df["risk_index"].apply(classify)
 
 # ---------------------------------------------------
-# 3. Global KPIs (updated with mini bar contribution charts)
+# 3. KPI Overview with Mini Bars
 # ---------------------------------------------------
-
 st.markdown("<div class='chart-card'>", unsafe_allow_html=True)
 st.markdown("### 🌍 Global Pollution Risk Overview")
 
@@ -208,13 +205,10 @@ avg_risk = agg_df["risk_index"].mean()
 worst_row = agg_df.loc[agg_df["risk_index"].idxmax()]
 best_row = agg_df.loc[agg_df["risk_index"].idxmin()]
 
-# Mini bar values per country
-worst_vals = worst_row[selected_pollutants].values.tolist()
-best_vals = best_row[selected_pollutants].values.tolist()
-
 labels = [pollutant_info[c][1] for c in selected_pollutants]
+worst_vals = [worst_row[c] for c in selected_pollutants]
+best_vals = [best_row[c] for c in selected_pollutants]
 
-# KPI columns
 c1, c2, c3 = st.columns(3)
 
 with c1:
@@ -223,9 +217,10 @@ with c1:
         <div class="kpi-card">
             <div class="kpi-label">Global Average Risk</div>
             <div class="kpi-value">{avg_risk:.2f}</div>
-            <div class="kpi-sub">Scaled index (0–1)</div>
+            <div class="kpi-sub">Scaled Index (0–1)</div>
         </div>
-        """, unsafe_allow_html=True
+        """,
+        unsafe_allow_html=True,
     )
 
 with c2:
@@ -235,7 +230,7 @@ with c2:
             <div class="kpi-label">Highest Risk Country</div>
             <div class="kpi-value">{worst_row['country']}</div>
             <div class="kpi-sub">Index {worst_row['risk_index']:.2f} ({worst_row['risk_level']})</div>
-            <div style="margin-top:8px;">{mini_bar_chart(worst_vals, labels)}</div>
+            <div style="margin-top:10px;">{mini_bar_chart(worst_vals, labels)}</div>
         </div>
         """,
         unsafe_allow_html=True,
@@ -248,7 +243,7 @@ with c3:
             <div class="kpi-label">Lowest Risk Country</div>
             <div class="kpi-value">{best_row['country']}</div>
             <div class="kpi-sub">Index {best_row['risk_index']:.2f} ({best_row['risk_level']})</div>
-            <div style="margin-top:8px;">{mini_bar_chart(best_vals, labels)}</div>
+            <div style="margin-top:10px;">{mini_bar_chart(best_vals, labels)}</div>
         </div>
         """,
         unsafe_allow_html=True,
@@ -257,29 +252,30 @@ with c3:
 st.markdown("</div>", unsafe_allow_html=True)
 
 # ---------------------------------------------------
-# 4. Ranking Chart
+# 4. Country Ranking Chart
 # ---------------------------------------------------
 st.markdown("<div class='chart-card'>", unsafe_allow_html=True)
-st.markdown("#### 3. Country risk ranking")
+st.markdown("### 3. Country Risk Ranking")
 
 top_n = st.slider("Show top N highest-risk countries", 5, 30, 10)
 
-top_countries = agg_df.sort_values("risk_index", ascending=False).head(top_n)
+top_df = agg_df.sort_values("risk_index", ascending=False).head(top_n)
 
 fig = px.bar(
-    top_countries,
+    top_df,
     x="country",
     y="risk_index",
     color="risk_level",
+    title=f"Top {top_n} Highest-Risk Countries",
     color_discrete_map={
         "Low": "#22c55e",
         "Moderate": "#eab308",
         "High": "#f97316",
         "Very High": "#ef4444",
-    },
-    title=f"Top {top_n} highest-risk countries",
+    }
 )
 fig.update_layout(height=450, margin=dict(l=0, r=0, t=40, b=0))
+
 st.plotly_chart(fig, use_container_width=True)
 
 with st.expander("Show full table"):
@@ -295,15 +291,16 @@ st.markdown("</div>", unsafe_allow_html=True)
 # 5. Interpretation
 # ---------------------------------------------------
 st.markdown("<div class='chart-card'>", unsafe_allow_html=True)
-st.markdown("#### 4. How to interpret the risk index?")
+st.markdown("### 4. How to interpret the risk index?")
 st.markdown(
     """
-- The **risk index** is a combined, normalised score (0–1).
-- Each pollutant is scaled so countries are compared fairly.
-- **Risk categories** come from quartiles of all risk values.
-- You can adjust pollutants & weights to explore different scenarios.
+- **Risk Index 0–1:** 0 = cleanest, 1 = highest-risk  
+- **Normalised pollutants** allow fair country-to-country comparison  
+- **Risk levels** come from quartile cut-offs  
+- **Preset modes** simulate different health/science models  
 """
 )
 st.markdown("</div>", unsafe_allow_html=True)
+
 
 
