@@ -268,22 +268,39 @@ c3.markdown(mini_bar_chart(best_vals, labels), unsafe_allow_html=True)
 
 st.markdown("</div>", unsafe_allow_html=True)
 
-
-
 # ---------------------------------------------------
-# 4. Risk Ranking
+# 4. Risk Ranking (with Risk Level Filter)
 # ---------------------------------------------------
 st.markdown("<div class='chart-card'>", unsafe_allow_html=True)
 st.markdown("### 3. Country Risk Ranking")
 
+# --- new: risk level selector ---
+risk_levels = ["Low", "Moderate", "High", "Very High"]
+
+selected_levels = st.multiselect(
+    "Select risk levels to display:",
+    risk_levels,
+    default=risk_levels  # show all by default
+)
+
+# Filter according to selected levels
+filtered_df = agg_df[agg_df["risk_level"].isin(selected_levels)]
+
+# If nothing selected
+if filtered_df.empty:
+    st.warning("No countries match the selected risk levels.")
+    st.stop()
+
+# Top N slider
 top_n = st.slider("Show top N highest-risk countries", 5, 30, 10)
-top_df = agg_df.sort_values("risk_index", ascending=False).head(top_n)
+
+top_df = filtered_df.sort_values("risk_index", ascending=False).head(top_n)
 
 fig = px.bar(
     top_df,
     x="country", y="risk_index",
     color="risk_level",
-    title=f"Top {top_n} Highest-Risk Countries",
+    title=f"Top {top_n} Countries (Filtered)",
     color_discrete_map={
         "Low": "#22c55e",
         "Moderate": "#eab308",
@@ -291,15 +308,14 @@ fig = px.bar(
         "Very High": "#ef4444",
     }
 )
-fig.update_layout(height=450, margin=dict(l=0, r=0, t=40, b=0))
 
+fig.update_layout(height=450, margin=dict(l=0, r=0, t=40, b=0))
 st.plotly_chart(fig, use_container_width=True)
 
 with st.expander("Show full table"):
-    st.dataframe(agg_df.sort_values("risk_index", ascending=False))
+    st.dataframe(filtered_df.sort_values("risk_index", ascending=False))
 
 st.markdown("</div>", unsafe_allow_html=True)
-
 
 
 # ---------------------------------------------------
