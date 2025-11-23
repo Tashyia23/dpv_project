@@ -3,6 +3,8 @@
 import os
 import pandas as pd
 
+from utils.merged_dataset import load_master_dataset 
+
 # -----------------------------------------------------
 # Helper: Safe CSV loader with fallback + clean errors
 # -----------------------------------------------------
