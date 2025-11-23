@@ -56,20 +56,27 @@ def load_pm25_data():
         path = "data/raw/pm25-air-pollution.csv"
         df = pd.read_csv(path)
 
-        # Clean column names
-        df.columns = [c.strip().lower().replace(" ", "_") for c in df.columns]
+        # Standardize column names
+        df.columns = [c.strip() for c in df.columns]
 
-        # Ensure proper naming
-        if "year" not in df.columns and "Year" in df.columns:
+        # Fix Year column
+        if "Year" in df.columns and "year" not in df.columns:
             df = df.rename(columns={"Year": "year"})
 
+        # Fix entity/country
+        if "Entity" in df.columns:
+            df = df.rename(columns={"Entity": "country"})
         if "entity" in df.columns:
             df = df.rename(columns={"entity": "country"})
+
+        # Clean numeric Year
+        df["year"] = pd.to_numeric(df["year"], errors="coerce")
+        df = df.dropna(subset=["year"])
+        df["year"] = df["year"].astype(int)
 
         return df
 
     except Exception as e:
-        print("Error loading PM2.5 data:", e)
+        print("Error loading pm25 data:", e)
         return None
-
 
