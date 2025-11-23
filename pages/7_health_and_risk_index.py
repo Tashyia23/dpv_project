@@ -298,47 +298,42 @@ else:
 # 6. Risk Ranking
 # ====================================================================================
 
+# ---------------------------------------------------
+# 4. Country Risk Ranking (clean version)
+# ---------------------------------------------------
 st.markdown("<div class='chart-card'>", unsafe_allow_html=True)
 st.markdown("### 3. Country Risk Ranking")
 
-# --- Pollutant selection ---
-ranking_metric = st.selectbox(
-    "Sort countries by:",
-    {
-        "risk_index": "Overall Risk Index",
-        "pm25_aqi_value": "PM2.5 (Fine Particles)",
-        "pm10_aqi_value": "PM10 (Coarse Particles)",
-        "no2_aqi_value": "NO₂ (Nitrogen Dioxide)",
-        "ozone_aqi_value": "O₃ (Ozone)",
-        "co_aqi_value": "CO (Carbon Monoxide)"
+top_n = st.slider("Show top N highest-risk countries", 5, 30, 10)
+
+display_df = agg_df.sort_values("risk_index", ascending=False).head(top_n)
+
+# Clean x-axis labels (remove any HTML just in case)
+display_df["country"] = display_df["country"].astype(str).str.replace("<.*?>", "", regex=True)
+
+fig = px.bar(
+    display_df,
+    x="country",
+    y="risk_index",
+    color="risk_level",
+    title=f"Top {top_n} Highest-Risk Countries",
+    color_discrete_map={
+        "Low": "#22c55e",
+        "Moderate": "#eab308",
+        "High": "#f97316",
+        "Very High": "#ef4444",
     }
 )
 
-ranking_type = st.radio(
-    "Select ranking type:",
-    ["Highest", "Lowest"]
-)
+fig.update_layout(height=450, margin=dict(l=0, r=0, t=40, b=0))
 
-top_n = st.slider("Select number of countries to display", 5, 30, 10)
+st.plotly_chart(fig, use_container_width=True)
 
-# Decide ascending/descending
-ascending = ranking_type == "Lowest"
-
-subset_df = agg_df.sort_values(ranking_metric, ascending=ascending).head(top_n)
-
-# Chart title
-pollutant_titles = {
-    "risk_index": "Overall Risk",
-    "pm25_aqi_value": "PM2.5 Levels",
-    "pm10_aqi_value": "PM10 Levels",
-    "no2_aqi_value": "NO₂ Levels",
-    "ozone_aqi_value": "O₃ Levels",
-    "co_aqi_value": "CO Levels"
-}
-
-title = f"Top {top_n} Countries ({ranking_type} {pollutant_titles[ranking_metric]})"
+with st.expander("Show full table"):
+    st.dataframe(display_df)
 
 st.markdown("</div>", unsafe_allow_html=True)
+
 
 # ====================================================================================
 # 7. Interpretation
