@@ -67,21 +67,6 @@ if view_mode.startswith("Before"):
     fig_raw.update_layout(height=450, xaxis_tickangle=45)
     st.plotly_chart(fig_raw, use_container_width=True)
 
-    #___________
-    st.subheader("📊 Distribution of Raw AQI Values")
-
-fig_hist = px.histogram(
-    raw_g,
-    x=selected_pollutant,
-    nbins=40,
-    title=f"Distribution of Raw {selected_pollutant}",
-    color_discrete_sequence=["#0ea5e9"]
-)
-fig_hist.update_layout(height=350)
-st.plotly_chart(fig_hist, use_container_width=True)
-
-#________
-
     st.info(
         "You are currently viewing **raw AQI data before any cleaning**.\n\n"
         "Switch to *After Processing* to explore the fully normalised risk index and advanced analytics."
