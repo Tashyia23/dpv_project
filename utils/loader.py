@@ -1,7 +1,11 @@
 # utils/loader.py
 import pandas as pd
 import streamlit as st
-from utils.regions import assign_region   # ⬅ NEW
+from utils.regions import assign_region   
+from utils.merged_datasets import load_merged_dataset
+
+def load_master_data():
+    return load_merged_dataset()
 
 @st.cache_data(ttl=600, show_spinner=True)
 def load_base_data() -> pd.DataFrame:
