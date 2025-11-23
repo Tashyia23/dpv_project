@@ -1,98 +1,236 @@
+# pages/5_🧪_Data_Lab.py
 import streamlit as st
 import numpy as np
 import plotly.express as px
 from utils.loader import load_base_data
-from utils.preprocess import clean_missing, scale_column, percentile_filter
 from utils.ui import header
 
 st.set_page_config(layout="wide")
+base_df = load_base_data()
 
 header(
-    "🧪 Data Lab – Custom Analysis",
-    "Clean, transform, and explore AQI data interactively."
+    "🧪 Data Lab – Dynamic Problem & Preprocessing",
+    "Choose how to clean the data, apply transformations, and ask your own question."
 )
 
-df = load_base_data()
+st.markdown("<div class='chart-card'>", unsafe_allow_html=True)
+st.markdown("#### 1. Data cleaning & transformation settings")
+clean_col, info_col = st.columns([0.7, 0.3])
 
-# --------------------------------------------------------
-# 1. Cleaning Options
-# --------------------------------------------------------
-st.markdown("## 1. Data Cleaning Settings")
+with clean_col:
+    # Missing data strategy
+    missing_strategy = st.radio(
+        "Missing values handling",
+        [
+            "Leave as is (raw data)",
+            "Drop rows with any missing value",
+            "Fill numeric columns with column mean",
+            "Fill numeric columns with column median",
+        ],
+        index=0,
+    )
 
-missing_option = st.radio(
-    "Missing values handling:",
-    ["None", "Drop", "Mean", "Median"]
+    numeric_cols = base_df.select_dtypes(include="number").columns.tolist()
+    if not numeric_cols:
+        st.error("No numeric columns detected in the dataset.")
+        st.stop()
+
+    default_metric = "aqi_value" if "aqi_value" in numeric_cols else numeric_cols[0]
+    base_metric = st.selectbox(
+        "Metric to focus on (for scaling & filters)",
+        numeric_cols,
+        index=numeric_cols.index(default_metric),
+    )
+
+    norm_choice = st.selectbox(
+        "Normalisation / scaling (optional)",
+        ["None", "Min–max (0–1)", "Z-score (mean 0, std 1)"],
+    )
+
+    st.markdown(
+        "<div class='section-caption'>Optional noise filtering: keep only values within a percentile range.</div>",
+        unsafe_allow_html=True,
+    )
+    p_low, p_high = st.slider(
+        "Percentile range for the chosen metric",
+        min_value=0,
+        max_value=100,
+        value=(0, 100),
+        step=1,
+    )
+
+with info_col:
+    st.markdown("##### Why this matters?")
+    st.markdown(
+        "- **Missing values** can bias averages if ignored.\n"
+        "- **Normalisation** puts metrics on comparable scales.\n"
+        "- **Percentile filters** remove extreme outliers (noise)."
+    )
+
+# ---- Apply cleaning & transformations
+df_clean = base_df.copy()
+
+# Missing values
+if missing_strategy == "Drop rows with any missing value":
+    df_clean = df_clean.dropna()
+elif missing_strategy == "Fill numeric columns with column mean":
+    num_cols = df_clean.select_dtypes(include="number").columns
+    df_clean[num_cols] = df_clean[num_cols].apply(lambda col: col.fillna(col.mean()))
+elif missing_strategy == "Fill numeric columns with column median":
+    num_cols = df_clean.select_dtypes(include="number").columns
+    df_clean[num_cols] = df_clean[num_cols].apply(lambda col: col.fillna(col.median()))
+# else: leave as is
+
+# Normalisation
+active_metric_col = base_metric
+if norm_choice != "None":
+    col = df_clean[base_metric].astype(float)
+    if norm_choice == "Min–max (0–1)":
+        min_v, max_v = col.min(), col.max()
+        if max_v > min_v:
+            df_clean[f"{base_metric}_scaled"] = (col - min_v) / (max_v - min_v)
+            active_metric_col = f"{base_metric}_scaled"
+    elif norm_choice == "Z-score (mean 0, std 1)":
+        mean_v, std_v = col.mean(), col.std()
+        if std_v > 0:
+            df_clean[f"{base_metric}_z"] = (col - mean_v) / std_v
+            active_metric_col = f"{base_metric}_z"
+
+# Outlier filter
+if p_low > 0 or p_high < 100:
+    q_low = np.percentile(df_clean[base_metric].dropna(), p_low)
+    q_high = np.percentile(df_clean[base_metric].dropna(), p_high)
+    df_clean = df_clean[(df_clean[base_metric] >= q_low) & (df_clean[base_metric] <= q_high)]
+
+st.markdown("</div>", unsafe_allow_html=True)  # close cleaning card
+
+# Download cleaned data (hybrid upgrade)
+st.download_button(
+    "⬇️ Download cleaned dataset (CSV)",
+    df_clean.to_csv(index=False).encode("utf-8"),
+    "cleaned_air_pollution_data.csv",
+    "text/csv",
 )
 
-mapping = {
-    "None": "none",
-    "Drop": "drop",
-    "Mean": "mean",
-    "Median": "median"
-}
-df_clean = clean_missing(df.copy(), mapping[missing_option])
+st.markdown("<div class='chart-card'>", unsafe_allow_html=True)
+st.markdown("#### 2. Ask your own question (dynamic analysis)")
 
-# Scaling
-numeric_cols = df_clean.select_dtypes(include="number").columns.tolist()
-target_col = st.selectbox("Select metric:", numeric_cols)
+q_col1, q_col2, q_col3 = st.columns(3)
 
-scale_option = st.selectbox(
-    "Scaling method:",
-    ["None", "Min-max", "Z-score"]
-)
-
-scaling_map = {
-    "None": "none",
-    "Min-max": "minmax",
-    "Z-score": "zscore"
-}
-
-df_clean, active_col = scale_column(df_clean, target_col, scaling_map[scale_option])
-
-# Percentile filter
-low, high = st.slider(
-    "Percentile filter range:",
-    0, 100, (0, 100)
-)
-
-df_clean = percentile_filter(df_clean, target_col, low, high)
-
-# --------------------------------------------------------
-# 2. Question / Exploration
-# --------------------------------------------------------
-st.markdown("## 2. Ask a Question")
-
-analysis_type = st.radio(
-    "What would you like to analyse?",
-    [
-        "Record count",
-        "Average metric",
-        "Top N countries",
-        "Compare mean across countries"
-    ]
-)
-
-if analysis_type == "Record count":
-    st.metric("Rows after cleaning", len(df_clean))
-
-elif analysis_type == "Average metric":
-    st.metric("Average", f"{df_clean[active_col].mean():.2f}")
-
-elif analysis_type == "Top N countries":
-    if "country" not in df_clean.columns:
-        st.error("Country column missing.")
+with q_col1:
+    if "country" in df_clean.columns:
+        countries = sorted(df_clean["country"].dropna().unique().tolist())
+        default_countries = countries[:5] if len(countries) >= 5 else countries
+        selected_countries = st.multiselect(
+            "Filter by country (optional)",
+            countries,
+            default=default_countries,
+        )
     else:
-        n = st.slider("Select N:", 3, 20, 10)
-        agg = df_clean.groupby("country")[active_col].mean().nlargest(n).reset_index()
-        fig = px.bar(agg, x="country", y=active_col, title="Top Countries")
-        st.plotly_chart(fig, use_container_width=True)
-        st.dataframe(agg)
+        selected_countries = None
 
+with q_col2:
+    if "aqi_category" in df_clean.columns:
+        categories = sorted(df_clean["aqi_category"].dropna().unique().tolist())
+        selected_q_cats = st.multiselect(
+            "Filter by AQI category (optional)",
+            categories,
+            default=categories,
+        )
+    else:
+        selected_q_cats = None
+
+with q_col3:
+    v_min = float(df_clean[base_metric].min())
+    v_max = float(df_clean[base_metric].max())
+    val_low, val_high = st.slider(
+        f"Filter {base_metric} range",
+        min_value=float(round(v_min, 1)),
+        max_value=float(round(v_max, 1)),
+        value=(float(round(v_min, 1)), float(round(v_max, 1))),
+        step=1.0,
+    )
+
+df_q = df_clean.copy()
+if selected_countries:
+    df_q = df_q[df_q["country"].isin(selected_countries)]
+if selected_q_cats:
+    df_q = df_q[df_q["aqi_category"].isin(selected_q_cats)]
+df_q = df_q[(df_q[base_metric] >= val_low) & (df_q[base_metric] <= val_high)]
+
+st.markdown("##### What do you want to know?")
+q_type = st.radio(
+    "Choose an analysis type",
+    [
+        "How many records match my filters?",
+        "What is the average of the chosen metric?",
+        "Who are the top N countries by the chosen metric?",
+        "Compare mean metric across selected countries (bar chart).",
+    ],
+    label_visibility="collapsed",
+)
+
+if df_q.empty:
+    st.warning("No rows match your current filters. Try relaxing them.")
 else:
-    agg = df_clean.groupby("country")[active_col].mean().reset_index()
-    fig = px.bar(agg, x="country", y=active_col, title="Mean by Country")
-    st.plotly_chart(fig, use_container_width=True)
-    st.dataframe(agg)
+    if q_type == "How many records match my filters?":
+        count = len(df_q)
+        st.metric("Number of rows that match your filters", count)
 
-with st.expander("View cleaned dataset"):
-    st.dataframe(df_clean)
+    elif q_type == "What is the average of the chosen metric?":
+        avg_val = df_q[base_metric].mean()
+        st.metric(f"Average {base_metric} for your filtered subset", f"{avg_val:.2f}")
+
+    elif q_type == "Who are the top N countries by the chosen metric?":
+        if "country" not in df_q.columns:
+            st.error("Country column is missing – cannot aggregate.")
+        else:
+            n = st.slider("Top N countries", min_value=3, max_value=20, value=10)
+            agg = df_q.groupby("country", as_index=False)[base_metric].mean()
+            top_n = agg.nlargest(n, base_metric)
+            st.markdown("###### Result")
+            st.dataframe(top_n)
+
+            fig_top = px.bar(
+                top_n,
+                x="country",
+                y=base_metric,
+                title=f"Top {n} countries by {base_metric}",
+                color="country",
+                color_discrete_sequence=px.colors.qualitative.Set2,
+            )
+            fig_top.update_layout(
+                height=420,
+                margin=dict(l=0, r=0, t=40, b=0),
+                paper_bgcolor="rgba(0,0,0,0)",
+                plot_bgcolor="rgba(0,0,0,0)",
+                showlegend=False,
+            )
+            st.plotly_chart(fig_top, use_container_width=True)
+    else:
+        if "country" not in df_q.columns:
+            st.error("Country column is missing – cannot aggregate.")
+        else:
+            agg = df_q.groupby("country", as_index=False)[base_metric].mean()
+            fig_cmp = px.bar(
+                agg,
+                x="country",
+                y=base_metric,
+                title=f"Mean {base_metric} for countries in your filtered subset",
+                color="country",
+                color_discrete_sequence=px.colors.qualitative.Set2,
+            )
+            fig_cmp.update_layout(
+                height=420,
+                margin=dict(l=0, r=0, t=40, b=0),
+                paper_bgcolor="rgba(0,0,0,0)",
+                plot_bgcolor="rgba(0,0,0,0)",
+                showlegend=False,
+            )
+            st.plotly_chart(fig_cmp, use_container_width=True)
+
+    with st.expander("Show cleaned & filtered data table"):
+        st.dataframe(df_q)
+
+st.markdown("</div>", unsafe_allow_html=True)
+
