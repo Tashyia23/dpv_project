@@ -1,24 +1,34 @@
 # pages/5_🧪_Data_Lab.py
 import streamlit as st
 import numpy as np
+import pandas as pd
 import plotly.express as px
-from utils.loader import load_master_data
-from utils.loader import load_base_data
+
+from utils.merged_datasets import load_master_dataset
 from utils.ui import header
 
 st.set_page_config(layout="wide")
-#base_df = load_base_data()
 
-base_df = load_master_data()
-
+# ---------------------------------------------------------
+# LOAD MERGED DATASET (REAL-TIME PROCESSING)
+# ---------------------------------------------------------
+base_df = load_master_dataset()
 
 header(
     "🧪 Data Lab – Dynamic Problem & Preprocessing",
-    "Choose how to clean the data, apply transformations, and ask your own question."
+    "Experiment with cleaning, normalisation, outlier filtering, and ask custom analytical questions."
 )
 
+if base_df is None or base_df.empty:
+    st.error("Merged dataset could not be loaded.")
+    st.stop()
+
+# ---------------------------------------------------------
+# 1. CLEANING & TRANSFORMATION UI
+# ---------------------------------------------------------
 st.markdown("<div class='chart-card'>", unsafe_allow_html=True)
-st.markdown("#### 1. Data cleaning & transformation settings")
+st.markdown("### 1. Cleaning & Transformation Settings")
+
 clean_col, info_col = st.columns([0.7, 0.3])
 
 with clean_col:
@@ -27,36 +37,41 @@ with clean_col:
         "Missing values handling",
         [
             "Leave as is (raw data)",
-            "Drop rows with any missing value",
-            "Fill numeric columns with column mean",
-            "Fill numeric columns with column median",
+            "Drop rows with ANY missing value",
+            "Fill numeric columns with mean",
+            "Fill numeric columns with median",
         ],
-        index=0,
     )
 
     numeric_cols = base_df.select_dtypes(include="number").columns.tolist()
+
     if not numeric_cols:
-        st.error("No numeric columns detected in the dataset.")
+        st.error("No numeric columns were detected in the dataset.")
         st.stop()
 
-    default_metric = "aqi_value" if "aqi_value" in numeric_cols else numeric_cols[0]
+    # Best default metric (priority order)
+    priority_cols = [
+        "pm25_aqi_value", "aqi_value", "pm10_aqi_value",
+        "no2_aqi_value", "ozone_aqi_value", "co_aqi_value"
+    ]
+    default_metric = next((c for c in priority_cols if c in numeric_cols), numeric_cols[0])
+
     base_metric = st.selectbox(
-        "Metric to focus on (for scaling & filters)",
+        "Metric to focus on (for scaling, filtering & ranking)",
         numeric_cols,
-        index=numeric_cols.index(default_metric),
+        index=numeric_cols.index(default_metric)
     )
 
+    # Normalisation options
     norm_choice = st.selectbox(
-        "Normalisation / scaling (optional)",
-        ["None", "Min–max (0–1)", "Z-score (mean 0, std 1)"],
+        "Normalisation (optional)",
+        ["None", "Min–Max (0–1)", "Z-Score (mean 0, std 1)"]
     )
 
-    st.markdown(
-        "<div class='section-caption'>Optional noise filtering: keep only values within a percentile range.</div>",
-        unsafe_allow_html=True,
-    )
+    # Outlier removal
+    st.caption("Optional noise filtering (keep values within selected percentiles).")
     p_low, p_high = st.slider(
-        "Percentile range for the chosen metric",
+        "Percentile range of the selected metric",
         min_value=0,
         max_value=100,
         value=(0, 100),
@@ -64,176 +79,184 @@ with clean_col:
     )
 
 with info_col:
-    st.markdown("##### Why this matters?")
-    st.markdown(
-        "- **Missing values** can bias averages if ignored.\n"
-        "- **Normalisation** puts metrics on comparable scales.\n"
-        "- **Percentile filters** remove extreme outliers (noise)."
-    )
+    st.markdown("#### Why this matters?")
+    st.markdown("""
+    - **Missing values** may distort statistical results  
+    - **Normalisation** places all values on comparable scales  
+    - **Percentile filtering** removes extreme outliers / noise  
+    """)
 
-# ---- Apply cleaning & transformations
+# Make a copy for cleaning
 df_clean = base_df.copy()
 
-# Missing values
-if missing_strategy == "Drop rows with any missing value":
+# ---------------------------------------------------------
+# APPLY MISSING VALUE STRATEGY
+# ---------------------------------------------------------
+if missing_strategy == "Drop rows with ANY missing value":
     df_clean = df_clean.dropna()
-elif missing_strategy == "Fill numeric columns with column mean":
-    num_cols = df_clean.select_dtypes(include="number").columns
-    df_clean[num_cols] = df_clean[num_cols].apply(lambda col: col.fillna(col.mean()))
-elif missing_strategy == "Fill numeric columns with column median":
-    num_cols = df_clean.select_dtypes(include="number").columns
-    df_clean[num_cols] = df_clean[num_cols].apply(lambda col: col.fillna(col.median()))
-# else: leave as is
 
-# Normalisation
-active_metric_col = base_metric
-if norm_choice != "None":
+elif missing_strategy == "Fill numeric columns with mean":
+    for col in numeric_cols:
+        df_clean[col] = df_clean[col].fillna(df_clean[col].mean())
+
+elif missing_strategy == "Fill numeric columns with median":
+    for col in numeric_cols:
+        df_clean[col] = df_clean[col].fillna(df_clean[col].median())
+# else: Raw data (no modification)
+
+# ---------------------------------------------------------
+# APPLY NORMALISATION
+# ---------------------------------------------------------
+active_metric_col = base_metric  # by default
+
+if norm_choice == "Min–Max (0–1)":
     col = df_clean[base_metric].astype(float)
-    if norm_choice == "Min–max (0–1)":
-        min_v, max_v = col.min(), col.max()
-        if max_v > min_v:
-            df_clean[f"{base_metric}_scaled"] = (col - min_v) / (max_v - min_v)
-            active_metric_col = f"{base_metric}_scaled"
-    elif norm_choice == "Z-score (mean 0, std 1)":
-        mean_v, std_v = col.mean(), col.std()
-        if std_v > 0:
-            df_clean[f"{base_metric}_z"] = (col - mean_v) / std_v
-            active_metric_col = f"{base_metric}_z"
+    if col.max() > col.min():
+        df_clean[f"{base_metric}_scaled"] = (col - col.min()) / (col.max() - col.min())
+        active_metric_col = f"{base_metric}_scaled"
 
-# Outlier filter
+elif norm_choice == "Z-Score (mean 0, std 1)":
+    col = df_clean[base_metric].astype(float)
+    if col.std() > 0:
+        df_clean[f"{base_metric}_z"] = (col - col.mean()) / col.std()
+        active_metric_col = f"{base_metric}_z"
+
+# ---------------------------------------------------------
+# OUTLIER FILTER BASED ON PERCENTILE RANGE
+# ---------------------------------------------------------
 if p_low > 0 or p_high < 100:
     q_low = np.percentile(df_clean[base_metric].dropna(), p_low)
     q_high = np.percentile(df_clean[base_metric].dropna(), p_high)
     df_clean = df_clean[(df_clean[base_metric] >= q_low) & (df_clean[base_metric] <= q_high)]
 
-st.markdown("</div>", unsafe_allow_html=True)  # close cleaning card
+st.markdown("</div>", unsafe_allow_html=True)
 
-# Download cleaned data (hybrid upgrade)
+# ---------------------------------------------------------
+# DOWNLOAD CLEANED DATASET
+# ---------------------------------------------------------
 st.download_button(
     "⬇️ Download cleaned dataset (CSV)",
     df_clean.to_csv(index=False).encode("utf-8"),
-    "cleaned_air_pollution_data.csv",
-    "text/csv",
+    file_name="cleaned_master_dataset.csv",
+    mime="text/csv"
 )
 
+# ---------------------------------------------------------
+# 2. CUSTOM USER ANALYSIS
+# ---------------------------------------------------------
 st.markdown("<div class='chart-card'>", unsafe_allow_html=True)
-st.markdown("#### 2. Ask your own question (dynamic analysis)")
+st.markdown("### 2. Ask Your Custom Question")
 
 q_col1, q_col2, q_col3 = st.columns(3)
 
+# Country filter
 with q_col1:
     if "country" in df_clean.columns:
-        countries = sorted(df_clean["country"].dropna().unique().tolist())
-        default_countries = countries[:5] if len(countries) >= 5 else countries
+        countries = sorted(df_clean["country"].unique())
         selected_countries = st.multiselect(
             "Filter by country (optional)",
             countries,
-            default=default_countries,
+            default=countries[:5]
         )
     else:
         selected_countries = None
 
+# AQI category filter (if available)
 with q_col2:
     if "aqi_category" in df_clean.columns:
-        categories = sorted(df_clean["aqi_category"].dropna().unique().tolist())
-        selected_q_cats = st.multiselect(
-            "Filter by AQI category (optional)",
+        categories = sorted(df_clean["aqi_category"].dropna().unique())
+        selected_cats = st.multiselect(
+            "AQI category filter",
             categories,
-            default=categories,
+            default=categories
         )
     else:
-        selected_q_cats = None
+        selected_cats = None
 
+# Numeric filter for chosen metric
 with q_col3:
-    v_min = float(df_clean[base_metric].min())
-    v_max = float(df_clean[base_metric].max())
+    min_val, max_val = df_clean[base_metric].min(), df_clean[base_metric].max()
     val_low, val_high = st.slider(
-        f"Filter {base_metric} range",
-        min_value=float(round(v_min, 1)),
-        max_value=float(round(v_max, 1)),
-        value=(float(round(v_min, 1)), float(round(v_max, 1))),
+        f"{base_metric}: Select value range",
+        min_value=float(min_val),
+        max_value=float(max_val),
+        value=(float(min_val), float(max_val)),
         step=1.0,
     )
 
+# Apply filters
 df_q = df_clean.copy()
 if selected_countries:
     df_q = df_q[df_q["country"].isin(selected_countries)]
-if selected_q_cats:
-    df_q = df_q[df_q["aqi_category"].isin(selected_q_cats)]
+if selected_cats:
+    if "aqi_category" in df_q.columns:
+        df_q = df_q[df_q["aqi_category"].isin(selected_cats)]
 df_q = df_q[(df_q[base_metric] >= val_low) & (df_q[base_metric] <= val_high)]
 
-st.markdown("##### What do you want to know?")
-q_type = st.radio(
-    "Choose an analysis type",
+# ---------------------------------------------------------
+# SELECT ANALYSIS TYPE
+# ---------------------------------------------------------
+analysis_choice = st.radio(
+    "Choose analysis",
     [
         "How many records match my filters?",
-        "What is the average of the chosen metric?",
-        "Who are the top N countries by the chosen metric?",
-        "Compare mean metric across selected countries (bar chart).",
+        "What is the average of the selected metric?",
+        "Top N countries by the selected metric",
+        "Compare selected metric across countries (bar chart)",
     ],
     label_visibility="collapsed",
 )
 
+# ---------------------------------------------------------
+# EXECUTE ANALYSIS
+# ---------------------------------------------------------
 if df_q.empty:
-    st.warning("No rows match your current filters. Try relaxing them.")
+    st.warning("No rows match your filters.")
 else:
-    if q_type == "How many records match my filters?":
-        count = len(df_q)
-        st.metric("Number of rows that match your filters", count)
+    if analysis_choice == "How many records match my filters?":
+        st.metric("Matching rows", len(df_q))
 
-    elif q_type == "What is the average of the chosen metric?":
-        avg_val = df_q[base_metric].mean()
-        st.metric(f"Average {base_metric} for your filtered subset", f"{avg_val:.2f}")
+    elif analysis_choice == "What is the average of the selected metric?":
+        st.metric("Average value", f"{df_q[base_metric].mean():.2f}")
 
-    elif q_type == "Who are the top N countries by the chosen metric?":
+    elif analysis_choice == "Top N countries by the selected metric":
         if "country" not in df_q.columns:
-            st.error("Country column is missing – cannot aggregate.")
+            st.error("Country column missing.")
         else:
-            n = st.slider("Top N countries", min_value=3, max_value=20, value=10)
-            agg = df_q.groupby("country", as_index=False)[base_metric].mean()
-            top_n = agg.nlargest(n, base_metric)
-            st.markdown("###### Result")
-            st.dataframe(top_n)
+            n = st.slider("Top N", 3, 20, 10)
+            rank = df_q.groupby("country")[base_metric].mean().nlargest(n).reset_index()
+            st.dataframe(rank)
 
-            fig_top = px.bar(
-                top_n,
+            fig = px.bar(
+                rank,
                 x="country",
                 y=base_metric,
-                title=f"Top {n} countries by {base_metric}",
                 color="country",
+                title=f"Top {n} Countries by {base_metric}",
                 color_discrete_sequence=px.colors.qualitative.Set2,
             )
-            fig_top.update_layout(
-                height=420,
-                margin=dict(l=0, r=0, t=40, b=0),
-                paper_bgcolor="rgba(0,0,0,0)",
-                plot_bgcolor="rgba(0,0,0,0)",
-                showlegend=False,
-            )
-            st.plotly_chart(fig_top, use_container_width=True)
-    else:
+            fig.update_layout(height=420)
+            st.plotly_chart(fig, use_container_width=True)
+
+    else:  # Comparison Bar Chart
         if "country" not in df_q.columns:
-            st.error("Country column is missing – cannot aggregate.")
+            st.error("Country column missing.")
         else:
-            agg = df_q.groupby("country", as_index=False)[base_metric].mean()
-            fig_cmp = px.bar(
-                agg,
+            comp = df_q.groupby("country")[base_metric].mean().reset_index()
+
+            fig = px.bar(
+                comp,
                 x="country",
                 y=base_metric,
-                title=f"Mean {base_metric} for countries in your filtered subset",
                 color="country",
+                title=f"{base_metric} Comparison Across Selected Countries",
                 color_discrete_sequence=px.colors.qualitative.Set2,
             )
-            fig_cmp.update_layout(
-                height=420,
-                margin=dict(l=0, r=0, t=40, b=0),
-                paper_bgcolor="rgba(0,0,0,0)",
-                plot_bgcolor="rgba(0,0,0,0)",
-                showlegend=False,
-            )
-            st.plotly_chart(fig_cmp, use_container_width=True)
+            fig.update_layout(height=420)
+            st.plotly_chart(fig, use_container_width=True)
 
-    with st.expander("Show cleaned & filtered data table"):
+    # Show table
+    with st.expander("🔍 View cleaned & filtered data"):
         st.dataframe(df_q)
 
 st.markdown("</div>", unsafe_allow_html=True)
