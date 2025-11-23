@@ -2,9 +2,10 @@ import streamlit as st
 import numpy as np
 import pandas as pd
 import plotly.express as px
+
 from utils.loader import load_base_data
 from utils.ui import header
-from utils.regions import assign_region
+from utils.regions import REGION_COLORS 
 
 st.set_page_config(layout="wide")
 
@@ -45,8 +46,9 @@ if "country" not in df.columns:
     st.error("Dataset missing column 'country'")
     st.stop()
 
-df["region"] = df["country"].apply(assign_region)
-
+if "region" not in df.columns:
+    df["region"] = "Other" 
+    
 # ------------------------------------------------------------------------------------
 # 1. Configure Risk Score
 # ------------------------------------------------------------------------------------
@@ -127,7 +129,7 @@ st.markdown("</div>", unsafe_allow_html=True)
 # ------------------------------------------------------------------------------------
 # 2. Compute Risk Index
 # ------------------------------------------------------------------------------------
-agg_df = df[["country"] + selected_pollutants].groupby("country").mean().reset_index()
+agg_df = df[["country", "region"] + selected_pollutants].groupby("country", "region").mean().reset_index()
 
 scaled = {}
 for col in selected_pollutants:
@@ -296,68 +298,8 @@ else:
     st.dataframe(comp_df.style.format({country_a: "{:.2f}", country_b: "{:.2f}", "Difference": "{:.2f}"}))
 
 
-# ====================================================================================
-# 6. Country Risk Ranking
-# ====================================================================================
-
-# st.markdown("<div class='chart-card'>", unsafe_allow_html=True)
-# st.markdown("### 3. Country Risk Ranking")
-
-# mode = st.radio(
-#     "Choose ranking type:",
-#     ["Highest Risk", "Lowest Risk", "Middle (Average Range)", "Custom Percentile"],
-#     horizontal=True
-# )
-
-# if mode == "Highest Risk":
-#     top_n = st.slider("Show top N highest-risk countries", 5, 30, 10)
-#     display_df = agg_df.sort_values("risk_index", ascending=False).head(top_n)
-#     title = f"Top {top_n} Countries (Highest Overall Risk)"
-
-# elif mode == "Lowest Risk":
-#     top_n = st.slider("Show top N lowest-risk countries", 5, 30, 10)
-#     display_df = agg_df.sort_values("risk_index", ascending=True).head(top_n)
-#     title = f"Top {top_n} Countries (Lowest Overall Risk)"
-
-# elif mode == "Middle (Average Range)":
-#     st.info("Showing countries around the global median risk.")
-#     q1, median, q3 = np.percentile(agg_df["risk_index"], [25, 50, 75])
-#     display_df = agg_df[(agg_df["risk_index"] >= q1) & (agg_df["risk_index"] <= q3)]
-#     title = "Countries in the Average/Mid-Risk Range"
-
-# else:  # Custom Percentile
-#     low_p, high_p = st.slider("Select percentile range", 0, 100, (20, 80))
-#     lo = np.percentile(agg_df["risk_index"], low_p)
-#     hi = np.percentile(agg_df["risk_index"], high_p)
-#     display_df = agg_df[(agg_df["risk_index"] >= lo) & (agg_df["risk_index"] <= hi)]
-#     title = f"Countries Between {low_p}th and {high_p}th Percentile Risk"
-
-# # ----- CLEAN BAR CHART (NO URL ISSUE) -----
-# fig = px.bar(
-#     display_df,
-#     x="country", y="risk_index",
-#     color="risk_level",
-#     title=title,
-#     color_discrete_map={
-#         "Low": "#22c55e",
-#         "Moderate": "#eab308",
-#         "High": "#f97316",
-#         "Very High": "#ef4444",
-#     }
-# )
-
-# fig.update_traces(text=None, hovertemplate="<b>%{x}</b><br>Risk: %{y:.3f}")
-# fig.update_layout(height=450, margin=dict(l=0, r=0, t=40, b=0))
-
-# st.plotly_chart(fig, use_container_width=True)
-
-# with st.expander("Show full table"):
-#     st.dataframe(display_df.sort_values("risk_index", ascending=False))
-
-# st.markdown("</div>", unsafe_allow_html=True)
-
 # ---------------------------------------------------
-# 3. Country Risk Ranking (NEW VERSION WITH 2 TOGGLES)
+# 3. Country Risk Ranking (WITH 2 TOGGLES)
 # ---------------------------------------------------
 
 st.markdown("<div class='chart-card'>", unsafe_allow_html=True)
@@ -366,6 +308,16 @@ st.markdown("### 3. Country Risk Ranking")
 # -------------------------------
 # 🔹 TOGGLE 1 – Ranking Type
 # -------------------------------
+
+region_list = sorted(agg_df["region"].dropna().unique())
+selected_regions = st.multiselect(
+    "Filter by region",
+    region_list,
+    default=region_list,
+)
+
+filtered = agg_df[agg_df["region"].isin(selected_regions)].copy()
+
 ranking_mode = st.radio(
     "Select ranking type:",
     ["Highest Risk", "Lowest Risk", "Average", "Custom Percentile"],
