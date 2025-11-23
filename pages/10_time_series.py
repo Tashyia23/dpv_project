@@ -36,11 +36,11 @@ header(
     "See how pollution levels evolve over time by country and region."
 )
 
-if "year" not in df.columns:
-    st.error("The dataset does not contain a 'year' column. Please check your data.")
+if "Year" not in df.columns:
+    st.error("The dataset does not contain a 'Year' column. Please check your data.")
     st.stop()
 
-# Make sure year is numeric (int) and sorted
+# Make sure Year is numeric (int) and sorted
 df["Year"] = pd.to_numeric(df["Year"], errors="coerce")
 df = df.dropna(subset=["Year"])
 df["Year"] = df["Year"].astype(int)
@@ -102,7 +102,7 @@ with col_p2:
 
 with col_p3:
     smooth_window = st.slider(
-        "Rolling window (years)",
+        "Rolling window (Years)",
         min_value=1,
         max_value=5,
         value=1,
@@ -121,11 +121,11 @@ st.markdown("<div class='chart-card'>", unsafe_allow_html=True)
 st.markdown(f"### 2. Global Trend of {metric_label} Over Time")
 
 global_ts = (
-    df.groupby("year")[pollutant]
+    df.groupby("Year")[pollutant]
     .agg(agg_func)
     .reset_index()
     .rename(columns={pollutant: "value"})
-    .sort_values("year")
+    .sort_values("Year")
 )
 
 if smooth_window > 1:
@@ -137,7 +137,7 @@ else:
 
 fig_global = px.line(
     global_ts,
-    x="year",
+    x="Year",
     y="value_smooth",
     markers=True,
     title=f"Global {metric_label} ({agg_func_label})",
@@ -157,9 +157,9 @@ st.markdown("### 3. Country Time-Series Views")
 
 countries = sorted(df["country"].unique().tolist())
 
-# Default: top 5 by latest year pollutant
-latest_year = df["year"].max()
-latest_df = df[df["year"] == latest_year]
+# Default: top 5 by latest Year pollutant
+latest_Year = df["Year"].max()
+latest_df = df[df["Year"] == latest_Year]
 top_by_latest = (
     latest_df.groupby("country")[pollutant]
     .mean()
@@ -182,24 +182,24 @@ with col_c1:
 
     country_ts = (
         df[df["country"] == sel_country]
-        .groupby("year")[pollutant]
+        .groupby("Year")[pollutant]
         .agg(agg_func)
         .reset_index()
         .rename(columns={pollutant: "value"})
-        .sort_values("year")
+        .sort_values("Year")
     )
 
     # Add global for reference
     merged = country_ts.merge(
-        global_ts[["year", "value_smooth"]],
-        on="year",
+        global_ts[["Year", "value_smooth"]],
+        on="Year",
         how="left",
         suffixes=("_country", "_global"),
     )
 
     fig_country = px.line(
         merged,
-        x="year",
+        x="Year",
         y=["value_country", "value_smooth"],
         markers=True,
         labels={
@@ -229,16 +229,16 @@ with col_c2:
     if sel_multi:
         multi_ts = (
             df[df["country"].isin(sel_multi)]
-            .groupby(["country", "year"])[pollutant]
+            .groupby(["country", "Year"])[pollutant]
             .agg(agg_func)
             .reset_index()
             .rename(columns={pollutant: "value"})
-            .sort_values(["country", "year"])
+            .sort_values(["country", "Year"])
         )
 
         fig_multi = px.line(
             multi_ts,
-            x="year",
+            x="Year",
             y="value",
             color="country",
             markers=True,
@@ -271,7 +271,7 @@ with col_r1:
 
 with col_r2:
     normalize = st.checkbox(
-        "Normalise each region (index to first year = 100)",
+        "Normalise each region (index to first Year = 100)",
         value=False,
         help="Helps compare relative growth/decline rather than absolute levels.",
     )
@@ -279,11 +279,11 @@ with col_r2:
 if sel_regions:
     reg_ts = (
         df[df["region"].isin(sel_regions)]
-        .groupby(["region", "year"])[pollutant]
+        .groupby(["region", "Year"])[pollutant]
         .agg(agg_func)
         .reset_index()
         .rename(columns={pollutant: "value"})
-        .sort_values(["region", "year"])
+        .sort_values(["region", "Year"])
     )
 
     if normalize:
@@ -291,14 +291,14 @@ if sel_regions:
             lambda x: (x / x.iloc[0]) * 100 if x.iloc[0] != 0 else x * 0
         )
         y_col = "value_norm"
-        y_title = f"{metric_label} – indexed to first year (100)"
+        y_title = f"{metric_label} – indexed to first Year (100)"
     else:
         y_col = "value"
         y_title = metric_label
 
     fig_region = px.line(
         reg_ts,
-        x="year",
+        x="Year",
         y=y_col,
         color="region",
         markers=True,
@@ -318,10 +318,10 @@ st.markdown("</div>", unsafe_allow_html=True)
 # 5. Data table (optional explorer)
 # ---------------------------------------------------
 with st.expander("🔍 Show underlying time-series data"):
-    cols_to_show = ["country", "region", "year"] + pollutant_columns
+    cols_to_show = ["country", "region", "Year"] + pollutant_columns
     existing_cols = [c for c in cols_to_show if c in df.columns]
     st.dataframe(
         df[existing_cols]
-        .sort_values(["country", "year"])
+        .sort_values(["country", "Year"])
         .reset_index(drop=True)
     )
