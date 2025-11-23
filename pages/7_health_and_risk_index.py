@@ -129,7 +129,7 @@ st.markdown("</div>", unsafe_allow_html=True)
 # ------------------------------------------------------------------------------------
 # 2. Compute Risk Index
 # ------------------------------------------------------------------------------------
-agg_df = df[["country", "region"] + selected_pollutants].groupby("country", "region").mean().reset_index()
+agg_df = df[["country"] + selected_pollutants].groupby("country").mean().reset_index()
 
 scaled = {}
 for col in selected_pollutants:
