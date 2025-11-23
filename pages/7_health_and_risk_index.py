@@ -15,24 +15,73 @@ st.set_page_config(layout="wide")
 # Mini Bar UI
 # ------------------------------------------------------------------------------------
 
+# def mini_bar_chart(values, labels, max_width=220, height=10):
+#     html = "<div>"
+#     max_val = max(values) if max(values) else 1
+
+#     colors = ["#8B5CF6", "#0EA5E9", "#F59E0B", "#EF4444", "#10B981"]
+
+#     for i, v in enumerate(values):
+#         width = int((v / max_val) * max_width)
+#         color = colors[i % len(colors)]
+
+#         html += (
+#             "<div style='margin-bottom:14px;'>"
+#             f"<div style='font-size:0.85rem;color:#374151;font-weight:600;margin-bottom:4px;'>{labels[i]}</div>"
+#             f"<div style='background:#E5E7EB;border-radius:6px;height:{height}px;width:{max_width}px;'>"
+#             f"<div style='background:{color};width:{width}px;height:{height}px;border-radius:6px;'></div>"
+#             "</div>"
+#             f"<div style='font-size:0.75rem;color:#4B5563;margin-top:3px;text-align:right;width:{max_width}px;'>{v:.2f}</div>"
+#             "</div>"
+#         )
+
+#     html += "</div>"
+#     return html
+
+#_________________
+
 def mini_bar_chart(values, labels, max_width=220, height=10):
-    html = "<div>"
     max_val = max(values) if max(values) else 1
 
-    colors = ["#8B5CF6", "#0EA5E9", "#F59E0B", "#EF4444", "#10B981"]
+    gradients = [
+        "linear-gradient(90deg, #c084fc, #8b5cf6)",   # PM2.5   purple gradient
+        "linear-gradient(90deg, #67e8f9, #0ea5e9)",   # NO2     blue gradient
+        "linear-gradient(90deg, #fcd34d, #f59e0b)",   # Ozone   orange gradient
+        "linear-gradient(90deg, #f9a8d4, #ef4444)",   # CO      red gradient
+        "linear-gradient(90deg, #6ee7b7, #10b981)"    # fallback
+    ]
+
+    html = "<div style='margin-top:10px;'>"
 
     for i, v in enumerate(values):
-        width = int((v / max_val) * max_width)
-        color = colors[i % len(colors)]
+        width_pct = (v / max_val) * 100
+        bar_color = gradients[i % len(gradients)]
 
         html += (
-            "<div style='margin-bottom:14px;'>"
-            f"<div style='font-size:0.85rem;color:#374151;font-weight:600;margin-bottom:4px;'>{labels[i]}</div>"
-            f"<div style='background:#E5E7EB;border-radius:6px;height:{height}px;width:{max_width}px;'>"
-            f"<div style='background:{color};width:{width}px;height:{height}px;border-radius:6px;'></div>"
+            "<div style='margin-bottom:16px;'>"
+
+                # LABEL
+                f"<div style='font-size:0.85rem;color:#374151;font-weight:600;margin-bottom:6px;'>{labels[i]}</div>"
+
+                # OUTER BAR
+                f"<div style='background:#E5E7EB;border-radius:10px;height:{height}px;width:{max_width}px;overflow:hidden;'>"
+                
+                    # INNER BAR WITH ANIMATION + GRADIENT
+                    f"<div style='background:{bar_color};"
+                    f"height:{height}px;border-radius:10px;"
+                    f"width:0%;"
+                    f"animation:grow{i} 1.1s ease-out forwards;'>"
+                    "</div>"
+                "</div>"
+
+                # VALUE
+                f"<div style='font-size:0.75rem;color:#4B5563;margin-top:4px;"
+                f"text-align:right;width:{max_width}px;'>{v:.2f}</div>"
+
             "</div>"
-            f"<div style='font-size:0.75rem;color:#4B5563;margin-top:3px;text-align:right;width:{max_width}px;'>{v:.2f}</div>"
-            "</div>"
+
+            # ✨ Keyframe animations for each bar (prevents conflict)
+            f"<style>@keyframes grow{i} {{ from {{ width:0%; }} to {{ width:{width_pct}%; }} }}</style>"
         )
 
     html += "</div>"
