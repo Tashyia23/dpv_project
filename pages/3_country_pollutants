@@ -1,26 +1,60 @@
 # pages/3_🏙_Country_Pollutants.py
+
 import streamlit as st
 import plotly.express as px
-from utils.loader import load_base_data
-from utils.ui import header
+import pandas as pd
 
+from utils.merged_datasets import load_master_dataset
+from utils.ui import header
 
 st.set_page_config(layout="wide")
 
-base_df = load_base_data()
-
-
+# ---------------------------------------------------------
+# 1. Load merged dataset
+# ---------------------------------------------------------
+df = load_master_dataset()
 
 header(
     "🏙 Country Pollutant Breakdown",
     "Compare pollutant-specific AQI levels across multiple countries."
 )
 
-if "country" not in base_df.columns:
-    st.error("Column 'country' is missing in the dataset.")
+if df is None or df.empty:
+    st.error("Merged dataset could not be loaded.")
     st.stop()
 
-countries = sorted(base_df["country"].dropna().unique().tolist())
+# ---------------------------------------------------------
+# 2. Ensure 'country' column exists
+# ---------------------------------------------------------
+country_col = None
+for col in ["country", "Country", "entity", "Entity"]:
+    if col in df.columns:
+        country_col = col
+        break
+
+if country_col is None:
+    st.error("Dataset must contain a country/entity column.")
+    st.stop()
+
+df["country"] = df[country_col].astype(str)
+
+# ---------------------------------------------------------
+# 3. Detect pollutant columns automatically
+# ---------------------------------------------------------
+pollutant_cols = [c for c in df.columns if c.endswith("_aqi_value")]
+
+if not pollutant_cols:
+    st.warning("No pollutant-specific *_aqi_value columns found in the dataset.")
+    st.stop()
+
+# Pretty names for dropdown legend
+def pretty_name(col):
+    return col.replace("_aqi_value", "").replace("_", " ").upper()
+
+# ---------------------------------------------------------
+# 4. Country selection
+# ---------------------------------------------------------
+countries = sorted(df["country"].dropna().unique().tolist())
 default_countries = countries[:3] if len(countries) >= 3 else countries
 
 selected_countries = st.multiselect(
@@ -34,35 +68,44 @@ if not selected_countries:
     st.info("Select at least one country to view the comparison.")
     st.stop()
 
-df_c = base_df[base_df["country"].isin(selected_countries)]
+df_c = df[df["country"].isin(selected_countries)]
 
-pollutant_cols = [
-    c for c in base_df.columns if c.endswith("_aqi_value") and c != "aqi_value"
-]
-if not pollutant_cols:
-    st.warning("No pollutant-specific AQI columns found in the dataset.")
-    st.stop()
+# ---------------------------------------------------------
+# 5. Compute average pollutant values per country
+# ---------------------------------------------------------
+avg_df = (
+    df_c.groupby("country")[pollutant_cols]
+    .mean()
+    .reset_index()
+)
 
-avg_pollutants = df_c.groupby("country")[pollutant_cols].mean().reset_index()
-
-long_df = avg_pollutants.melt(
+# Convert to long format for Plotly
+long_df = avg_df.melt(
     id_vars="country",
     value_vars=pollutant_cols,
     var_name="pollutant",
     value_name="aqi_value",
 )
-long_df["pollutant"] = (
-    long_df["pollutant"].str.replace("_aqi_value", "", regex=False).str.upper()
-)
 
+# Clean readable pollutant names
+long_df["pollutant"] = long_df["pollutant"].apply(pretty_name)
+
+# ---------------------------------------------------------
+# 6. Chart Type Selector
+# ---------------------------------------------------------
 chart_type = st.selectbox(
     "Chart style",
     ["Grouped bar", "Stacked bar"],
     index=0,
 )
 
-st.markdown("<div class='chart-card'>", unsafe_allow_html=True)
 barmode = "group" if chart_type == "Grouped bar" else "stack"
+
+# ---------------------------------------------------------
+# 7. Bar Chart
+# ---------------------------------------------------------
+st.markdown("<div class='chart-card'>", unsafe_allow_html=True)
+
 fig_bar = px.bar(
     long_df,
     x="country",
@@ -73,15 +116,21 @@ fig_bar = px.bar(
     title="Average pollutant AQI levels by country",
     color_discrete_sequence=px.colors.qualitative.Set2,
 )
+
 fig_bar.update_layout(
     height=460,
     margin=dict(l=0, r=0, t=40, b=0),
     paper_bgcolor="rgba(0,0,0,0)",
     plot_bgcolor="rgba(0,0,0,0)",
 )
+
 st.plotly_chart(fig_bar, use_container_width=True)
+
 st.markdown("</div>", unsafe_allow_html=True)
 
+# ---------------------------------------------------------
+# 8. Show underlying values
+# ---------------------------------------------------------
 with st.expander("Show underlying values"):
     st.dataframe(long_df)
 
