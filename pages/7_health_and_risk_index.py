@@ -8,13 +8,54 @@ from utils.ui import header
 st.set_page_config(layout="wide")
 
 # ---------------------------------------------------
+# INJECT MATERIAL CARD CSS (B2)
+# ---------------------------------------------------
+st.markdown("""
+<style>
+.kpi-card {
+    background: #ffffff;
+    padding: 22px 24px;
+    border-radius: 16px;
+    border: 1px solid #e5e7eb;
+    box-shadow: 0 3px 12px rgba(0,0,0,0.08);
+    margin-bottom: 20px;
+}
+.kpi-label {
+    font-size: 0.95rem;
+    font-weight: 600;
+    color: #374151;
+}
+.kpi-value {
+    font-size: 1.9rem;
+    font-weight: 700;
+    margin-top: 4px;
+    color: #111827;
+}
+.kpi-sub {
+    font-size: 0.82rem;
+    color: #6b7280;
+    margin-top: 4px;
+}
+.chart-card {
+    margin-top: 20px;
+    background:#ffffff;
+    padding: 26px;
+    border-radius: 18px;
+    border: 1px solid #e5e7eb;
+    box-shadow: 0 3px 12px rgba(0,0,0,0.06);
+}
+</style>
+""", unsafe_allow_html=True)
+
+
+# ---------------------------------------------------
 # Mini horizontal bar chart 
 # ---------------------------------------------------
 def mini_bar_chart(values, labels, max_width=160, height=8, colors=None):
     if colors is None:
         colors = ["#7C3AED", "#0EA5E9", "#F59E0B", "#EF4444", "#10B981"]
 
-    html = "<div>"
+    html = "<div style='margin-top:6px;'>"
     max_val = max(values) if max(values) else 1
 
     for i, v in enumerate(values):
@@ -22,12 +63,12 @@ def mini_bar_chart(values, labels, max_width=160, height=8, colors=None):
         color = colors[i % len(colors)]
 
         html += (
-            "<div style='display:flex;align-items:center;gap:10px;margin-bottom:6px;'>"
-            f"<div style='width:150px;font-size:0.80rem;font-weight:500;color:#374151;'>{labels[i]}</div>"
-            f"<div style='flex-grow:1;max-width:{max_width}px;background:#E5E7EB;border-radius:4px;height:{height}px;'>"
-            f"<div style='background:{color};width:{width}px;height:{height}px;border-radius:4px;'></div>"
+            "<div style='display:flex;align-items:center;gap:10px;margin-bottom:8px;'>"
+            f"<div style='width:140px;font-size:0.80rem;font-weight:500;color:#374151;'>{labels[i]}</div>"
+            f"<div style='flex-grow:1;max-width:{max_width}px;background:#E5E7EB;border-radius:6px;height:{height}px;'>"
+            f"<div style='background:{color};width:{width}px;height:{height}px;border-radius:6px;'></div>"
             "</div>"
-            f"<div style='width:45px;text-align:right;font-size:0.80rem;color:#374151;'>{v:.2f}</div>"
+            f"<div style='width:50px;text-align:right;font-size:0.80rem;color:#374151;'>{v:.2f}</div>"
             "</div>"
         )
 
@@ -159,11 +200,7 @@ agg_df["risk_level"] = agg_df["risk_index"].apply(classify)
 
 
 # ---------------------------------------------------
-# 3. KPI Overview (FIXED + CLEAN)
-# ---------------------------------------------------
-
-# ---------------------------------------------------
-# 3. KPI Overview (FINAL FIXED VERSION)
+# 3. KPI Overview — MATERIAL STYLE (B2)
 # ---------------------------------------------------
 st.markdown("<div class='chart-card'>", unsafe_allow_html=True)
 st.markdown("### 🌍 Global Pollution Risk Overview")
@@ -179,44 +216,38 @@ best_vals = [float(best_row[c]) for c in selected_pollutants]
 c1, c2, c3 = st.columns(3)
 
 # -------- GLOBAL CARD --------
-with c1:
-    st.markdown("""
-    <div class="kpi-card">
-        <div class="kpi-label">Global Average Risk</div>
-        <div class="kpi-value">%.2f</div>
-        <div class="kpi-sub">Scaled index (0–1)</div>
-    </div>
-    """ % avg_risk, unsafe_allow_html=True)
+c1.markdown(f"""
+<div class="kpi-card">
+    <div class="kpi-label">Global Average Risk</div>
+    <div class="kpi-value">{avg_risk:.2f}</div>
+    <div class="kpi-sub">Scaled index (0–1)</div>
+</div>
+""", unsafe_allow_html=True)
 
 # -------- WORST COUNTRY --------
-with c2:
-    st.markdown(f"""
-    <div class="kpi-card">
-        <div class="kpi-label">Highest Risk Country</div>
-        <div class="kpi-value">{worst_row['country']}</div>
-        <div class="kpi-sub">Index {worst_row['risk_index']:.2f} ({worst_row['risk_level']})</div>
-        <div class="kpi-sub" style="margin-top:8px;">Pollutant Breakdown</div>
-    </div>
-    """, unsafe_allow_html=True)
-
-    # IMPORTANT: render separately
-    st.markdown(mini_bar_chart(worst_vals, labels), unsafe_allow_html=True)
+c2.markdown(f"""
+<div class="kpi-card">
+    <div class="kpi-label">Highest Risk Country</div>
+    <div class="kpi-value">{worst_row['country']}</div>
+    <div class="kpi-sub">Index {worst_row['risk_index']:.2f} ({worst_row['risk_level']})</div>
+    <div class="kpi-sub" style="margin-top:8px;">Pollutant Breakdown</div>
+</div>
+""", unsafe_allow_html=True)
+c2.markdown(mini_bar_chart(worst_vals, labels), unsafe_allow_html=True)
 
 # -------- BEST COUNTRY --------
-with c3:
-    st.markdown(f"""
-    <div class="kpi-card">
-        <div class="kpi-label">Lowest Risk Country</div>
-        <div class="kpi-value">{best_row['country']}</div>
-        <div class="kpi-sub">Index {best_row['risk_index']:.2f} ({best_row['risk_level']})</div>
-        <div class="kpi-sub" style="margin-top:8px;">Pollutant Breakdown</div>
-    </div>
-    """, unsafe_allow_html=True)
-
-    # IMPORTANT: render separately
-    st.markdown(mini_bar_chart(best_vals, labels), unsafe_allow_html=True)
+c3.markdown(f"""
+<div class="kpi-card">
+    <div class="kpi-label">Lowest Risk Country</div>
+    <div class="kpi-value">{best_row['country']}</div>
+    <div class="kpi-sub">Index {best_row['risk_index']:.2f} ({best_row['risk_level']})</div>
+    <div class="kpi-sub" style="margin-top:8px;">Pollutant Breakdown</div>
+</div>
+""", unsafe_allow_html=True)
+c3.markdown(mini_bar_chart(best_vals, labels), unsafe_allow_html=True)
 
 st.markdown("</div>", unsafe_allow_html=True)
+
 
 
 # ---------------------------------------------------
@@ -248,6 +279,7 @@ with st.expander("Show full table"):
     st.dataframe(agg_df.sort_values("risk_index", ascending=False))
 
 st.markdown("</div>", unsafe_allow_html=True)
+
 
 
 # ---------------------------------------------------
