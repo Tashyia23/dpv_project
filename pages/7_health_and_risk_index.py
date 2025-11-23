@@ -14,30 +14,6 @@ st.set_page_config(layout="wide")
 # ------------------------------------------------------------------------------------
 # Mini Bar UI
 # ------------------------------------------------------------------------------------
-# def mini_bar_chart(values, labels, max_width=160, height=8, colors=None):
-#     if colors is None:
-#         colors = ["#7C3AED", "#0EA5E9", "#F59E0B", "#EF4444", "#10B981"]
-
-#     html = "<div>"
-#     max_val = max(values) if max(values) else 1
-
-#     for i, v in enumerate(values):
-#         width = int((v / max_val) * max_width) if max_val > 0 else 0
-#         color = colors[i % len(colors)]
-#         html += f"""
-#         <div style='display:flex;align-items:center;gap:10px;margin-bottom:6px;'>
-#             <div style='width:150px;font-size:0.80rem;font-weight:500;color:#374151;'>{labels[i]}</div>
-#             <div style='flex-grow:1;max-width:{max_width}px;background:#E5E7EB;border-radius:4px;height:{height}px;'>
-#                 <div style='background:{color};width:{width}px;height:{height}px;border-radius:4px;'></div>
-#             </div>
-#             <div style='width:45px;text-align:right;font-size:0.80rem;color:#374151;'>{v:.2f}</div>
-#         </div>
-#         """
-#     html += "</div>"
-#     return html
-
-#________________
-
 
 def mini_bar_chart(values, labels, max_width=220, height=10):
     html = "<div>"
@@ -61,8 +37,6 @@ def mini_bar_chart(values, labels, max_width=220, height=10):
 
     html += "</div>"
     return html
-
-
 
 
 # ------------------------------------------------------------------------------------
