@@ -1,86 +1,90 @@
 # utils/loader.py
+
+import os
 import pandas as pd
-import streamlit as st
-from utils.regions import assign_region   
-from utils.merged_datasets import load_merged_dataset
 
+# -----------------------------------------------------
+# Helper: Safe CSV loader with fallback + clean errors
+# -----------------------------------------------------
+def safe_read_csv(path):
+    """
+    Safely read a CSV file.
+    Returns:
+        pd.DataFrame() (empty) if the file does not exist.
+    """
+    if not os.path.exists(path):
+        print(f"[loader.py] WARNING: File not found -> {path}")
+        return pd.DataFrame()  # Safe fallback
+
+    try:
+        return pd.read_csv(path)
+    except Exception as e:
+        print(f"[loader.py] ERROR loading CSV ({path}): {e}")
+        return pd.DataFrame()
+
+
+# -----------------------------------------------------
+# LOADERS FOR INDIVIDUAL RAW DATASETS
+# -----------------------------------------------------
+def load_global_pollution():
+    """Loads main global pollution dataset."""
+    path = os.path.join("data", "raw", "global_air_pollution.csv")
+    return safe_read_csv(path)
+
+
+def load_pm25_time_series():
+    """Loads PM2.5 long-format yearly dataset."""
+    path = os.path.join("data", "raw", "pm25-air-pollution.csv")
+    return safe_read_csv(path)
+
+
+# -----------------------------------------------------
+# MERGED DATASET (combines both without processing)
+# -----------------------------------------------------
 def load_master_data():
-    return load_merged_dataset()
+    """
+    Loads and combines all raw datasets using merged_datasets.py.
+    Returns a unified dataframe for dashboard-wide use.
+    """
+    try:
+        from utils.merged_datasets import load_merged_dataset
+    except Exception as e:
+        print(f"[loader.py] ERROR: Could not import merged_datasets.py -> {e}")
+        return pd.DataFrame()
 
-@st.cache_data(ttl=600, show_spinner=True)
-def load_base_data() -> pd.DataFrame:
-    """Global AQI dataset (merged Kaggle/global pollution data)."""
-    df = pd.read_csv("data/raw/global_air_pollution.csv")
+    df = load_merged_dataset()
 
-    # Normalise column names
-    df.columns = (
-        df.columns.str.strip()
-        .str.lower()
-        .str.replace(" ", "_")
-        .str.replace("(", "", regex=False)
-        .str.replace(")", "", regex=False)
-        .str.replace(".", "", regex=False)  # pm2.5 -> pm25
-    )
-
-    # Standardise key column names if present
-    rename_map = {}
-    for c in df.columns:
-        if c in ["entity", "country_name"]:
-            rename_map[c] = "country"
-        if c in ["overall_aqi_value", "overall_aqi", "aqi"]:
-            rename_map[c] = "aqi_value"
-        if c in ["overall_aqi_category"]:
-            rename_map[c] = "aqi_category"
-        if "pm25" in c and "aqi_value" in c:
-            rename_map[c] = "pm25_aqi_value"
-        if "pm10" in c and "aqi_value" in c:
-            rename_map[c] = "pm10_aqi_value"
-        if "no2" in c and "aqi_value" in c:
-            rename_map[c] = "no2_aqi_value"
-        if ("ozone" in c or "o3" in c) and "aqi_value" in c:
-            rename_map[c] = "ozone_aqi_value"
-        if "co" in c and "aqi_value" in c and c != "aqi_value":
-            rename_map[c] = "co_aqi_value"
-
-    if rename_map:
-        df = df.rename(columns=rename_map)
-
-    # 🔹 Add region column using country name
-    if "country" in df.columns:
-        df["region"] = df["country"].apply(assign_region)
+    if df.empty:
+        print("[loader.py] WARNING: merged dataset is EMPTY.")
     else:
-        df["region"] = "Other"
+        print("[loader.py] Loaded merged dataset successfully.")
 
     return df
 
 
-@st.cache_data(ttl=600)
+# -----------------------------------------------------
+# SPECIALIZED LOADERS (used by pages)
+# -----------------------------------------------------
+def load_base_data():
+    """
+    Used by the Risk Index dashboard pages.
+    Loads global_air_pollution.csv only.
+    """
+    df = load_global_pollution()
+
+    if df.empty:
+        print("[loader.py] WARNING: base data is EMPTY.")
+    return df
+
+
 def load_pm25_data():
-    try:
-        path = "data/raw/pm25-air-pollution.csv"
-        df = pd.read_csv(path)
+    """
+    Used by the Time-Series Explorer.
+    Loads PM2.5 time-series only.
+    """
+    df = load_pm25_time_series()
 
-        # Standardize column names
-        df.columns = [c.strip() for c in df.columns]
-
-        # Fix Year column
-        if "Year" in df.columns and "year" not in df.columns:
-            df = df.rename(columns={"Year": "year"})
-
-        # Fix entity/country
-        if "Entity" in df.columns:
-            df = df.rename(columns={"Entity": "country"})
-        if "entity" in df.columns:
-            df = df.rename(columns={"entity": "country"})
-
-        # Clean numeric Year
-        df["year"] = pd.to_numeric(df["year"], errors="coerce")
-        df = df.dropna(subset=["year"])
-        df["year"] = df["year"].astype(int)
-
-        return df
-
-    except Exception as e:
-        print("Error loading pm25 data:", e)
-        return None
+    if df.empty:
+        print("[loader.py] WARNING: PM2.5 dataset is EMPTY.")
+    return df
 
