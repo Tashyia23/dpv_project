@@ -38,28 +38,26 @@ st.set_page_config(layout="wide")
 
 #________________
 
-def mini_bar_chart(values, labels, max_width=220, height=10, colors=None):
-    if colors is None:
-        colors = ["#8B5CF6", "#0EA5E9", "#F59E0B", "#EF4444", "#10B981"]
 
-    html = "<div style='margin-top:10px;'>"
+def mini_bar_chart(values, labels, max_width=220, height=10):
+    html = "<div>"
     max_val = max(values) if max(values) else 1
+
+    colors = ["#8B5CF6", "#0EA5E9", "#F59E0B", "#EF4444", "#10B981"]
 
     for i, v in enumerate(values):
         width = int((v / max_val) * max_width)
         color = colors[i % len(colors)]
 
-        html += f"""
-        <div style='margin-bottom:14px;'>
-            <div style='font-size:0.85rem;color:#374151;font-weight:600;margin-bottom:4px;'>{labels[i]}</div>
-
-            <div style='background:#E5E7EB;border-radius:6px;height:{height}px;width:{max_width}px;'>
-                <div style='background:{color};width:{width}px;height:{height}px;border-radius:6px;'></div>
-            </div>
-
-            <div style='font-size:0.75rem;color:#4B5563;margin-top:3px;text-align:right;width:{max_width}px;'>{v:.2f}</div>
-        </div>
-        """
+        html += (
+            "<div style='margin-bottom:14px;'>"
+            f"<div style='font-size:0.85rem;color:#374151;font-weight:600;margin-bottom:4px;'>{labels[i]}</div>"
+            f"<div style='background:#E5E7EB;border-radius:6px;height:{height}px;width:{max_width}px;'>"
+            f"<div style='background:{color};width:{width}px;height:{height}px;border-radius:6px;'></div>"
+            "</div>"
+            f"<div style='font-size:0.75rem;color:#4B5563;margin-top:3px;text-align:right;width:{max_width}px;'>{v:.2f}</div>"
+            "</div>"
+        )
 
     html += "</div>"
     return html
