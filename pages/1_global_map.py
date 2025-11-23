@@ -2,7 +2,7 @@
 # import plotly.express as px
 # from utils.loader import load_base_data
 # from utils.ui import header
-from utils.merged_dataset import load_merged_dataset
+from utils.loader import load_master_data
 
 
 # st.set_page_config(layout="wide")
