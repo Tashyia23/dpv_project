@@ -407,7 +407,7 @@ import plotly.express as px
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 
-from utils.merged_datasets import load_master_dataset
+from utils.data_loader import load_master_data
 from utils.ui import header
 
 st.set_page_config(layout="wide")
