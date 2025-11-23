@@ -2,13 +2,17 @@
 import streamlit as st
 import plotly.express as px
 import numpy as np
+from utils.loader import load_master_data
+
 from utils.loader import load_base_data, load_pm25_data
 from utils.ui import header
 
 st.set_page_config(layout="wide")
 
-base_df = load_base_data()
-pm25_df = load_pm25_data()
+#base_df = load_base_data()
+#pm25_df = load_pm25_data()
+
+df = load_master_data()
 
 header(
     "🔍 Country Deep Dive",
