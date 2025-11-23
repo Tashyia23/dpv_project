@@ -1,5 +1,4 @@
 import streamlit as st
-from utils.merged_dataset import load_master_dataset
 
 @st.cache_data(show_spinner=False)
 def load_master():
