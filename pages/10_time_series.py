@@ -18,61 +18,54 @@ header(
 )
 
 if df is None:
-    st.error("PM₂.₅ time-series dataset not found.")
+    st.error("PM₂.₅ time-series dataset not found.\n\nExpected file:\n- data/raw/pm25-air-pollution.csv\n- OR pm25-air-pollution.csv\n")
     st.stop()
 
 # ---------------------------------------------------------
-# YEAR column fix (dataset uses 'Year')
+# Fix YEAR column
 # ---------------------------------------------------------
-if "Year" in df.columns:
-    df["year"] = pd.to_numeric(df["Year"], errors="coerce")
-else:
+if "year" not in df.columns:
     st.error("Dataset must contain a 'Year' column.")
     st.stop()
 
+df["year"] = pd.to_numeric(df["year"], errors="coerce")
 df = df.dropna(subset=["year"])
 df["year"] = df["year"].astype(int)
-
-# Sort by year
 df = df.sort_values("year")
 
 # ---------------------------------------------------------
-# Clean country column
+# Standardize country column
 # ---------------------------------------------------------
-if "Entity" in df.columns:
-    df = df.rename(columns={"Entity": "country"})
-elif "entity" in df.columns:
+if "entity" in df.columns:
     df = df.rename(columns={"entity": "country"})
 
 if "country" not in df.columns:
-    st.error("Dataset must contain a 'country' column.")
+    st.error("Dataset must contain a 'country' or 'entity' column.")
     st.stop()
 
 # ---------------------------------------------------------
-# Detect PM2.5 concentration column
+# Detect PM2.5 values column
 # ---------------------------------------------------------
-value_cols = [
-    c for c in df.columns
-    if "pm25" in c.lower() or "pm2" in c.lower() or "fine particulate" in c.lower()
-]
+value_cols = [c for c in df.columns if "pm" in c or "particulate" in c]
 
 if len(value_cols) == 0:
-    st.error("Could not detect a PM₂.₅ concentration column.")
+    st.error("Could not find PM₂.₅ concentration column.")
     st.stop()
 
-pm_col = value_cols[0]  # use first detected column
+pm_col = value_cols[0]  # first match
 
 # ---------------------------------------------------------
-# Sidebar Controls
+# Sidebar Filters
 # ---------------------------------------------------------
 st.sidebar.header("🔎 Filters")
+
 mode = st.sidebar.radio(
     "Select View Mode:",
     ["Global Trend", "Single Country", "Compare Countries"]
 )
 
 # ---------------------------------------------------------
-# 1️⃣ GLOBAL TREND
+# GLOBAL PM2.5 TREND
 # ---------------------------------------------------------
 if mode == "Global Trend":
     st.subheader("🌍 Global PM₂.₅ Trend Over Time")
@@ -84,20 +77,20 @@ if mode == "Global Trend":
         x="year",
         y=pm_col,
         markers=True,
-        line_shape="spline",
-        title="Global Average PM₂.₅ Concentration Over Time",
-        labels={pm_col: "PM₂.₅ (μg/m³)"}
+        title="Global Average PM₂.₅ Over Time",
+        labels={pm_col: "PM₂.₅ Concentration (μg/m³)"},
     )
     st.plotly_chart(fig, use_container_width=True)
 
 # ---------------------------------------------------------
-# 2️⃣ SINGLE COUNTRY TREND
+# SINGLE COUNTRY TREND
 # ---------------------------------------------------------
 elif mode == "Single Country":
+
     st.subheader("🇨🇺 Country Trend Over Time")
 
     countries = sorted(df["country"].unique())
-    country = st.selectbox("Select a country:", countries)
+    country = st.selectbox("Select country:", countries)
 
     cdf = df[df["country"] == country]
 
@@ -106,16 +99,17 @@ elif mode == "Single Country":
         x="year",
         y=pm_col,
         markers=True,
-        line_shape="spline",
         title=f"PM₂.₅ Trend — {country}",
-        labels={pm_col: "PM₂.₅ (μg/m³)"}
+        labels={pm_col: "PM₂.₅ Concentration (μg/m³)"},
     )
+
     st.plotly_chart(fig, use_container_width=True)
 
 # ---------------------------------------------------------
-# 3️⃣ MULTIPLE COUNTRY COMPARISON
+# MULTI-COUNTRY COMPARISON
 # ---------------------------------------------------------
 elif mode == "Compare Countries":
+
     st.subheader("🌐 Compare Multiple Countries")
 
     countries = sorted(df["country"].unique())
@@ -125,7 +119,7 @@ elif mode == "Compare Countries":
         default=["Afghanistan", "India", "China"]
     )
 
-    if len(selected) == 0:
+    if len(selected) < 1:
         st.info("Select at least one country.")
         st.stop()
 
@@ -137,24 +131,18 @@ elif mode == "Compare Countries":
         y=pm_col,
         color="country",
         markers=True,
-        line_shape="spline",
-        title="PM₂.₅ Levels — Multi-Country Comparison",
-        labels={pm_col: "PM₂.₅ (μg/m³)"}
+        title="Country Comparison — PM₂.₅ Levels",
+        labels={pm_col: "PM₂.₅ Concentration (μg/m³)"},
     )
-    fig.update_layout(legend_title="Country")
 
     st.plotly_chart(fig, use_container_width=True)
 
 # ---------------------------------------------------------
 # Summary Statistics
 # ---------------------------------------------------------
-st.markdown("### 📊 Summary Statistics (Global Annual Stats)")
+st.markdown("### 📊 Summary Statistics")
 
 summary = df.groupby("year")[pm_col].agg(["mean", "min", "max"]).reset_index()
-summary = summary.rename(columns={
-    "mean": "Avg PM₂.₅",
-    "min": "Min PM₂.₅",
-    "max": "Max PM₂.₅"
-})
 
 st.dataframe(summary, use_container_width=True)
+
