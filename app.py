@@ -88,6 +88,21 @@ with col2:
 
 st.markdown("---")
 
+st.subheader("🌫️ Understanding the Pollutants")
+
+pollutant_info = {
+    "PM2.5": "Fine inhalable particles <2.5μm. Penetrates lungs and bloodstream, most harmful.",
+    "PM10": "Coarse particles <10μm. Dust, pollen, construction dust.",
+    "NO₂": "Gas from vehicle emissions and industrial activities.",
+    "O₃": "Ground-level ozone formed by chemical reactions under sunlight; irritates lungs.",
+    "CO": "Carbon monoxide from combustion and vehicles; reduces oxygen delivery to organs.",
+}
+
+with st.expander("Click to view pollutant descriptions"):
+    for p, desc in pollutant_info.items():
+        st.markdown(f"**{p}** — {desc}")
+
+
 # ---------------------------------------------------------
 # Footer
 # ---------------------------------------------------------
