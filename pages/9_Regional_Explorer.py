@@ -646,6 +646,10 @@ with tab_heatmap_p:
 # -------------------------------------------------------------------------
 # TAB C — HEATMAP (Processed)
 # -------------------------------------------------------------------------
+
+# -------------------------------------------------------------------------
+# TAB C — HEATMAP (Processed)
+# -------------------------------------------------------------------------
 with tab_heatmap_p:
     st.markdown("### Heatmap – Country vs Pollutant (Processed Dataset)")
 
@@ -672,6 +676,7 @@ with tab_heatmap_p:
             title=f"Processed AQI Heatmap – {selected_region_heat_p}",
         )
         st.plotly_chart(fig_heat_p, use_container_width=True)
+
 
 
 
