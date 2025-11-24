@@ -13,6 +13,14 @@ from utils.ui import header
 
 st.set_page_config(layout="wide")
 
+# Function to load custom CSS (ensure it's loaded for every page)
+def load_css():
+    with open("styles/custom.css") as f:
+        st.markdown(f"<style>{f.read()}</style>", unsafe_allow_html=True)
+
+# Load the CSS in each page (this ensures the styles are applied across pages)
+load_css()
+
 # =============================================================================
 # 1. UNIVERSAL CSV LOADER
 # =============================================================================
