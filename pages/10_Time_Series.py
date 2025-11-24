@@ -1,9 +1,9 @@
 import os
 import streamlit as st
 import pandas as pd
-import numpy as np
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
+import plotly.express as px
 
 from utils.ui import header
 
@@ -17,17 +17,10 @@ def load_css():
 # Load the CSS in each page (this ensures the styles are applied across pages)
 load_css()
 
-
 # -------------------------------------------------------------------
 # Helper: robust loader for WHO PM2.5 time-series file
 # -------------------------------------------------------------------
 def load_who_pm25():
-    """
-    Try several common locations for the WHO PM2.5 time-series file.
-    Returns a cleaned DataFrame with columns:
-        country, year, pm25_value
-    or None if nothing can be loaded.
-    """
     candidates = [
         "data/raw/pm25-air-pollution.csv",
         "data/pm25_air_pollution.csv",
@@ -48,8 +41,6 @@ def load_who_pm25():
     if df is None:
         return None
 
-    # Expect: Entity, Code, Year,
-    #   "Concentrations of fine particulate matter (PM2.5) - Residence area type: Total"
     col_name = "Concentrations of fine particulate matter (PM2.5) - Residence area type: Total"
 
     if "Entity" not in df.columns or "Year" not in df.columns or col_name not in df.columns:
@@ -65,16 +56,13 @@ def load_who_pm25():
         inplace=True,
     )
 
-    # clean numeric
     out["year"] = pd.to_numeric(out["year"], errors="coerce")
     out["pm25_value"] = pd.to_numeric(out["pm25_value"], errors="coerce")
     out = out.dropna(subset=["year", "pm25_value"])
     out["year"] = out["year"].astype(int)
 
-    # Health-risk index relative to WHO guideline 25 μg/m³
     out["who_index"] = out["pm25_value"] / 25.0
 
-    # % change vs first available year (per country)
     base = (
         out.sort_values("year")
         .groupby("country")["pm25_value"]
@@ -87,7 +75,6 @@ def load_who_pm25():
     ) * 100.0
 
     return out
-
 
 # -------------------------------------------------------------------
 # 1. Load data
@@ -118,7 +105,6 @@ view_mode = st.radio(
     horizontal=True,
 )
 
-# Metric options inside each view
 if view_mode.startswith("Before"):
     metric_options = {
         "Raw PM₂.₅ concentration (μg/m³)": "pm25_value",
@@ -126,7 +112,7 @@ if view_mode.startswith("Before"):
     }
     default_metric = "pm25_value"
     metric_label_suffix = ""
-    secondary_series = "who_index"  # optional for dual-axis
+    secondary_series = "who_index"
 else:
     metric_options = {
         "WHO health-risk index (PM₂.₅ / 25)": "who_index",
@@ -135,25 +121,14 @@ else:
     }
     default_metric = "who_index"
     metric_label_suffix = " (WHO Index)"
-    secondary_series = "pm25_value"  # optional dual-axis
+    secondary_series = "pm25_value"
 
 # -------------------------------------------------------------------
 # 3. Tabs for different exploration modes
 # -------------------------------------------------------------------
-# tab_global, tab_country, tab_compare = st.tabs(
-#     ["🌍 Global Trend", "🇺🇳 Single Country", "🌐 Compare Countries"]
-# )
-
-tab_global, tab_country, tab_compare, tab_city = st.tabs(
-    [
-        "🌍 Global Trend",
-        "🇺🇳 Single Country",
-        "🌐 Compare Countries",
-        "🏙 Snapshot AQI by City"
-    ]
+tab_global, tab_country, tab_compare, tab_snapshot = st.tabs(
+    ["🌍 Global Trend", "🇺🇳 Single Country", "🌐 Compare Countries", "🏙 Snapshot AQI by City"]
 )
-
-
 
 # -------------------------------------------------------------------
 # Utility: build dual-axis time series
@@ -167,7 +142,6 @@ def build_dual_axis(
     secondary_name="Secondary",
 ):
     fig = make_subplots(specs=[[{"secondary_y": True}]])
-
     series = df.sort_values("year")
     fig.add_trace(
         go.Scatter(
@@ -204,13 +178,11 @@ def build_dual_axis(
 
     return fig
 
-
 # -------------------------------------------------------------------
 # TAB 1 — GLOBAL TREND
 # -------------------------------------------------------------------
 with tab_global:
     st.markdown("## 🌍 Global Trend")
-
     metric_key = st.selectbox(
         "Select metric:",
         list(metric_options.keys()),
@@ -219,7 +191,6 @@ with tab_global:
     )
     metric_col = metric_options[metric_key]
 
-    # Aggregate global values (mean across countries per year)
     global_df = (
         who_df.groupby("year")[["pm25_value", "who_index", "pct_change_since_base"]]
         .mean()
@@ -247,39 +218,13 @@ with tab_global:
     )
     st.plotly_chart(fig_global, use_container_width=True)
 
-    # Summary metrics
-    latest_year = global_df["year"].max()
-    latest_row = global_df[global_df["year"] == latest_year].iloc[0]
-
-    col1, col2, col3 = st.columns(3)
-    with col1:
-        st.metric(
-            f"Latest year in data",
-            int(latest_year),
-        )
-    with col2:
-        st.metric(
-            f"{metric_key} ({latest_year})",
-            f"{latest_row[metric_col]:.2f}",
-        )
-    with col3:
-        if metric_col != "pct_change_since_base":
-            change_col = "pct_change_since_base"
-            st.metric(
-                "Global % change since first year",
-                f"{latest_row[change_col]:.1f}%",
-            )
-
-
 # -------------------------------------------------------------------
 # TAB 2 — SINGLE COUNTRY
 # -------------------------------------------------------------------
 with tab_country:
     st.markdown("## 🇺🇳 Single Country View")
-
     countries = sorted(who_df["country"].unique())
     country = st.selectbox("Select a country:", countries, key="single_country")
-
     metric_key = st.selectbox(
         "Select metric:",
         list(metric_options.keys()),
@@ -287,23 +232,11 @@ with tab_country:
         key="country_metric",
     )
     metric_col = metric_options[metric_key]
-
     cdf = who_df[who_df["country"] == country].copy()
 
     if cdf.empty:
         st.info("No data available for this country.")
     else:
-        if view_mode.startswith("Before"):
-            primary_name = metric_key
-            secondary_name = (
-                "WHO Health-Risk Index (PM₂.₅ / 25)" if secondary_series == "who_index" else "PM₂.₅ (μg/m³)"
-            )
-        else:
-            primary_name = metric_key
-            secondary_name = (
-                "PM₂.₅ concentration (μg/m³)" if secondary_series == "pm25_value" else "WHO Index"
-            )
-
         fig_country = build_dual_axis(
             cdf,
             primary_col=metric_col,
@@ -314,28 +247,11 @@ with tab_country:
         )
         st.plotly_chart(fig_country, use_container_width=True)
 
-        # Summary table
-        summary = (
-            cdf[["year", "pm25_value", "who_index", "pct_change_since_base"]]
-            .sort_values("year")
-            .rename(
-                columns={
-                    "pm25_value": "PM₂.₅ (μg/m³)",
-                    "who_index": "WHO index (PM₂.₅/25)",
-                    "pct_change_since_base": "% change vs first year",
-                }
-            )
-        )
-        st.markdown(f"### 📊 Yearly Summary — {country}")
-        st.dataframe(summary, use_container_width=True)
-
-
 # -------------------------------------------------------------------
 # TAB 3 — COMPARE COUNTRIES
 # -------------------------------------------------------------------
 with tab_compare:
     st.markdown("## 🌐 Compare Countries")
-
     metric_key = st.selectbox(
         "Select metric:",
         list(metric_options.keys()),
@@ -343,21 +259,13 @@ with tab_compare:
         key="compare_metric",
     )
     metric_col = metric_options[metric_key]
-
     countries = sorted(who_df["country"].unique())
-    default_selection = [c for c in ["Afghanistan", "India", "China", "Malaysia"] if c in countries]
-
     selected = st.multiselect(
-        "Choose countries to compare:",
-        countries,
-        default=default_selection,
+        "Choose countries to compare:", countries, default=["Afghanistan", "India", "China", "Malaysia"]
     )
 
-    if not selected:
-        st.info("Select at least one country to compare.")
-    else:
+    if selected:
         comp_df = who_df[who_df["country"].isin(selected)].copy()
-
         fig = make_subplots(specs=[[{"secondary_y": True}]])
         for c in selected:
             subset = comp_df[comp_df["country"] == c].sort_values("year")
@@ -370,65 +278,14 @@ with tab_compare:
                 ),
                 secondary_y=False,
             )
-
-        # Optional global average risk line
-        if secondary_series in comp_df.columns:
-            risk_df = (
-                comp_df.groupby("year")[secondary_series]
-                .mean()
-                .reset_index()
-                .sort_values("year")
-            )
-            fig.add_trace(
-                go.Scatter(
-                    x=risk_df["year"],
-                    y=risk_df[secondary_series],
-                    mode="lines",
-                    name="Global Avg Risk Index",
-                    line=dict(color="#EF4444", dash="dash"),
-                ),
-                secondary_y=True,
-            )
-
-        fig.update_layout(
-            title=f"Comparison of {metric_key} Across Countries{metric_label_suffix}",
-            margin=dict(l=40, r=40, t=60, b=40),
-            legend_title_text="",
-        )
-        fig.update_xaxes(title_text="Year")
-        fig.update_yaxes(title_text=metric_key, secondary_y=False)
-        fig.update_yaxes(
-            title_text="Global Avg WHO Index" if secondary_series == "who_index" else "Global Avg PM₂.₅",
-            secondary_y=True,
-        )
-
         st.plotly_chart(fig, use_container_width=True)
 
-        # Compact summary table
-        summary = (
-            comp_df.groupby(["country", "year"])[metric_col]
-            .mean()
-            .reset_index()
-            .rename(columns={metric_col: "value"})
-            .pivot(index="year", columns="country", values="value")
-        )
-        st.markdown("### 📊 Comparison Table")
-        st.dataframe(summary, use_container_width=True)
-
-#___________
-
 # -------------------------------------------------------------------
-# TAB 4 — SNAPSHOT AQI BY CITY (Processed AQI)
+# TAB 4 — SNAPSHOT AQI BY CITY (ONLY IN THIS TAB)
 # -------------------------------------------------------------------
-# -------------------------------------------------------------------
-# TAB 4 — SNAPSHOT AQI BY CITY
-# -------------------------------------------------------------------
-tab_snapshot = st.tabs(["🏙 Snapshot AQI by City"])[0]
-
 with tab_snapshot:
-
     st.markdown("## 🏙 Snapshot AQI by City")
-    st.write("Analyze AQI values across cities using the processed AQI dataset.")
+    st.write("This section is for AQI by city-specific data.")
 
     # ---------------------------------------------------------------
     # Load city-level AQI dataset (your uploaded file)
@@ -566,4 +423,3 @@ with tab_snapshot:
     # ---------------------------------------------------------------
     st.markdown("### 📄 Full City-Level AQI Table")
     st.dataframe(city_df, use_container_width=True)
-
