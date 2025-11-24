@@ -10,9 +10,7 @@ import pandas as pd
 import numpy as np
 import plotly.express as px
 
-from reportlab.lib.pagesizes import A4
-from reportlab.pdfgen import canvas
-from reportlab.lib.utils import ImageReader
+from fpdf import FPDF
 
 from utils.ui import header
 
@@ -557,105 +555,99 @@ with tab_dashboard:
 
 
 # ===============================================================
-# PART 8 — PDF Export: Cleaning & Feature Summary
+# PART 8 — PDF Export using FPDF (Streamlit Cloud compatible)
 # ===============================================================
+from fpdf import FPDF
+
 st.header("📄 Export Report as PDF")
 
 export_pdf = st.button("📥 Generate PDF Report")
 
 if export_pdf:
-    # Temp file for PDF
-    tmp_pdf = tempfile.NamedTemporaryFile(delete=False, suffix=".pdf")
-    c = canvas.Canvas(tmp_pdf.name, pagesize=A4)
-    width, height = A4
 
-    # 1) TITLE PAGE
-    c.setFont("Helvetica-Bold", 20)
-    c.drawString(40, height - 80, "Data Processing & Visualisation Report")
+    pdf = FPDF()
+    pdf.set_auto_page_break(auto=True, margin=15)
 
-    c.setFont("Helvetica", 14)
-    c.drawString(40, height - 120, "Generated from Upload & Analyse Module")
+    # -----------------------------------------------------------
+    # PAGE 1 — TITLE
+    # -----------------------------------------------------------
+    pdf.add_page()
+    pdf.set_font("Arial", "B", 18)
+    pdf.cell(0, 10, "Data Processing & Visualisation Report", ln=True)
 
-    c.setFont("Helvetica", 10)
-    c.drawString(40, height - 150, "Includes:")
-    c.drawString(60, height - 165, "- Cleaning Summary")
-    c.drawString(60, height - 180, "- Feature Engineering Summary")
-    c.drawString(60, height - 195, "- Visualisations (optional)")
+    pdf.set_font("Arial", "", 12)
+    pdf.ln(5)
+    pdf.multi_cell(0, 8, "Generated automatically from the Upload & Analyse module.\n")
+    pdf.ln(3)
+    pdf.set_font("Arial", "I", 11)
+    pdf.multi_cell(0, 6, "- Cleaning Summary\n- Feature Engineering Summary\n- Auto-generated insights")
 
-    c.showPage()
+    # -----------------------------------------------------------
+    # PAGE 2 — CLEANING SUMMARY
+    # -----------------------------------------------------------
+    pdf.add_page()
+    pdf.set_font("Arial", "B", 16)
+    pdf.cell(0, 10, "Cleaning Summary", ln=True)
 
-    # 2) CLEANING SUMMARY
-    c.setFont("Helvetica-Bold", 16)
-    c.drawString(40, height - 60, "🧹 Cleaning Summary")
+    pdf.set_font("Arial", "", 12)
 
-    c.setFont("Helvetica", 11)
-    if "clean_choice" in locals() and clean_choice:
-        top = height - 100
-        c.drawString(40, top, "Cleaning Steps Applied:")
+    if clean_choice:
         for step in clean_choice:
-            top -= 18
-            c.drawString(60, top, f"- {step}")
+            pdf.multi_cell(0, 8, f"- {step}")
     else:
-        c.drawString(40, height - 100, "No cleaning operations were applied.")
+        pdf.multi_cell(0, 8, "No cleaning performed.")
 
-    c.showPage()
+    # -----------------------------------------------------------
+    # PAGE 3 — FEATURE ENGINEERING SUMMARY
+    # -----------------------------------------------------------
+    pdf.add_page()
+    pdf.set_font("Arial", "B", 16)
+    pdf.cell(0, 10, "Feature Engineering Summary", ln=True)
+    pdf.set_font("Arial", "", 12)
 
-    # 3) FEATURE ENGINEERING SUMMARY
-    c.setFont("Helvetica-Bold", 16)
-    c.drawString(40, height - 60, "🧪 Feature Engineering Summary")
-
-    c.setFont("Helvetica", 11)
-    if "feat_choice" in locals() and feat_choice:
-        top = height - 100
+    if feat_choice:
         for step in feat_choice:
-            c.drawString(60, top, f"- {step}")
-            top -= 18
+            pdf.multi_cell(0, 8, f"- {step}")
     else:
-        c.drawString(40, height - 100, "No feature engineering applied.")
+        pdf.multi_cell(0, 8, "No feature engineering applied.")
 
-    c.showPage()
+    # -----------------------------------------------------------
+    # PAGE 4 — OPTIONAL CHART IMAGES
+    # -----------------------------------------------------------
+    pdf.add_page()
+    pdf.set_font("Arial", "B", 16)
+    pdf.cell(0, 10, "Visualisations", ln=True)
+    pdf.set_font("Arial", "", 12)
 
-    # 4) VISUALISATIONS (OPTIONAL)
-    c.setFont("Helvetica-Bold", 16)
-    c.drawString(40, height - 60, "📊 Visualisations")
-
-    chart_objects = st.session_state.get("export_charts", [])
-    top = height - 100
-
-    if chart_objects:
-        for idx, fig in enumerate(chart_objects):
+    charts = st.session_state.get("export_charts", [])
+    if charts:
+        for fig in charts:
             try:
-                png_bytes = fig.to_image(format="png")
-                img = ImageReader(io.BytesIO(png_bytes))
+                img_bytes = fig.to_image(format="png")
+                img_path = tempfile.NamedTemporaryFile(delete=False, suffix=".png").name
+                with open(img_path, "wb") as f:
+                    f.write(img_bytes)
 
-                c.drawImage(
-                    img,
-                    40,
-                    top - 250,
-                    width=500,
-                    height=250,
-                    preserveAspectRatio=True,
-                )
-                top -= 320
-
-                if top < 120:
-                    c.showPage()
-                    top = height - 100
-            except Exception:
-                continue
+                pdf.ln(5)
+                pdf.image(img_path, w=180)
+            except:
+                pdf.multi_cell(0, 8, "Error exporting a chart.")
     else:
-        c.setFont("Helvetica", 11)
-        c.drawString(40, height - 100, "No charts exported to PDF.")
+        pdf.multi_cell(0, 8, "No charts exported.")
 
-    c.save()
+    # -----------------------------------------------------------
+    # EXPORT
+    # -----------------------------------------------------------
+    output_path = tempfile.NamedTemporaryFile(delete=False, suffix=".pdf").name
+    pdf.output(output_path)
 
-    # 5) DOWNLOAD BUTTON
-    with open(tmp_pdf.name, "rb") as f:
+    with open(output_path, "rb") as f:
         st.download_button(
-            label="📥 Download PDF Report",
-            data=f,
+            "📥 Download PDF Report",
+            f,
             file_name="data_visualisation_report.pdf",
-            mime="application/pdf",
+            mime="application/pdf"
         )
 
-    st.success("✅ PDF report generated.")
+    st.success("✅ PDF exported successfully!")
+
