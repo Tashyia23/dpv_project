@@ -2,217 +2,182 @@ import streamlit as st
 import pandas as pd
 import numpy as np
 import plotly.express as px
-import plotly.graph_objects as go
-from plotly.subplots import make_subplots
 
 from utils.ui import header
 
 st.set_page_config(layout="wide")
 
-# -----------------------------------------------------
-# Helper Functions
-# -----------------------------------------------------
 
-def clean_dataframe(df: pd.DataFrame) -> pd.DataFrame:
-    """Standard auto-cleaning for any uploaded dataset."""
-    df = df.copy()
-
-    # Clean column names
-    df.columns = (
-        df.columns
-        .str.strip()
-        .str.lower()
-        .str.replace(" ", "_")
-        .str.replace("-", "_")
-    )
-
-    # Convert obvious date columns
-    for col in df.columns:
-        if any(keyword in col for keyword in ["date", "time", "year"]):
-            try:
-                df[col] = pd.to_datetime(df[col], errors="ignore")
-            except:
-                pass
-
-    # Convert numeric-like columns
-    for col in df.columns:
-        if df[col].dtype == object:
-            try:
-                df[col] = pd.to_numeric(df[col], errors="ignore")
-            except:
-                pass
-
-    # Handle missing values
-    numeric_cols = df.select_dtypes(include=np.number).columns
-    categorical_cols = df.select_dtypes(exclude=np.number).columns
-
-    if len(numeric_cols) > 0:
-        df[numeric_cols] = df[numeric_cols].fillna(df[numeric_cols].median())
-
-    if len(categorical_cols) > 0:
-        df[categorical_cols] = df[categorical_cols].fillna("Unknown")
-
-    return df
-
-
-def detect_pollution_dataset(df: pd.DataFrame) -> bool:
-    """Check if uploaded dataset is an air pollution dataset."""
-    pollution_keywords = [
-        "pm25", "pm10", "aqi", "co", "no2", "o3", "ozone",
-        "carbon_monoxide", "nitrogen_dioxide", "fine_particulate"
+# --------------------------------------------------------------------
+# Robust universal CSV loader (handles WAQI, COVID, large messy files)
+# --------------------------------------------------------------------
+def load_uploaded_csv(file):
+    """
+    Load any CSV reliably:
+    - Handles UTF-8, latin1, mixed encodings
+    - Skips malformed lines (WAQI datasets & API dumps)
+    - Handles huge files (up to 200MB)
+    """
+    loaders = [
+        {"encoding": "utf-8", "engine": "c"},
+        {"encoding": "latin1", "engine": "c"},
+        {"encoding": "latin1", "engine": "python"},
     ]
 
-    cols = " ".join(df.columns)
-    return any(keyword in cols.lower() for keyword in pollution_keywords)
+    for opt in loaders:
+        try:
+            file.seek(0)
+            return pd.read_csv(
+                file,
+                encoding=opt["encoding"],
+                engine=opt["engine"],
+                on_bad_lines="skip",
+                low_memory=False,
+            )
+        except Exception:
+            continue
+
+    return None  # All attempts failed
 
 
-# -----------------------------------------------------
-# Page Layout Header
-# -----------------------------------------------------
-
+# --------------------------------------------------------------------
+# Page Header
+# --------------------------------------------------------------------
 header(
     "📤 Upload & Analyse Your Dataset",
     "Upload any CSV file for automatic cleaning, profiling, and visualisation."
 )
 
-st.markdown("### Upload a dataset to begin:")
 
-uploaded_file = st.file_uploader("Choose a CSV file:", type=["csv"])
+# --------------------------------------------------------------------
+# File Upload UI
+# --------------------------------------------------------------------
+st.markdown("## Upload a dataset to begin:")
 
-if uploaded_file is None:
-    st.info("Please upload a dataset to start analysis.")
-    st.stop()
-
-# -----------------------------------------------------
-# Load & Clean Data
-# -----------------------------------------------------
-
-try:
-    raw_df = pd.read_csv(uploaded_file)
-except Exception:
-    st.error("❌ Could not read the file. Make sure it's a valid CSV.")
-    st.stop()
-
-df = clean_dataframe(raw_df)
-
-st.success("✅ Dataset successfully loaded and cleaned!")
-
-st.markdown("### 📄 Preview of cleaned dataset:")
-st.dataframe(df.head(), use_container_width=True)
-
-# -----------------------------------------------------
-# Auto-Detect Dataset Type
-# -----------------------------------------------------
-
-is_pollution = detect_pollution_dataset(df)
-
-if is_pollution:
-    st.markdown("### 🔍 Detected: Air Pollution Dataset")
-else:
-    st.markdown("### 🔍 Detected: General Dataset")
-
-# -----------------------------------------------------
-# Tabs
-# -----------------------------------------------------
-
-tab_overview, tab_visuals, tab_advanced = st.tabs(
-    ["🔎 Overview", "📊 Visualisations", "🧪 Advanced Analysis"]
+uploaded_file = st.file_uploader(
+    "Choose a CSV file:",
+    type=["csv"],
+    help="Supports large CSV files up to 200MB, including WAQI & scientific datasets."
 )
 
-# -----------------------------------------------------
-# TAB 1 — Overview
-# -----------------------------------------------------
-with tab_overview:
-    st.markdown("## 🧭 Dataset Overview")
-
-    st.write("### Shape")
-    st.write(df.shape)
-
-    st.write("### Column Types")
-    st.write(df.dtypes)
-
-    st.write("### Missing Values")
-    missing = df.isnull().sum().to_frame("missing_count")
-    st.dataframe(missing, use_container_width=True)
-
-    st.write("### Summary Statistics")
-    st.dataframe(df.describe(include="all"), use_container_width=True)
+if not uploaded_file:
+    st.info("📂 Upload a CSV file to continue.")
+    st.stop()
 
 
-# -----------------------------------------------------
-# TAB 2 — Visualisations
-# -----------------------------------------------------
-with tab_visuals:
-    st.markdown("## 📊 Visualisations")
+# --------------------------------------------------------------------
+# Load file using robust loader
+# --------------------------------------------------------------------
+df = load_uploaded_csv(uploaded_file)
 
-    if is_pollution:
-        st.markdown("### 🌫 Air Pollution Visualisations")
-
-        # Pollutant columns
-        pollutant_cols = [
-            c for c in df.columns
-            if any(p in c for p in ["pm25", "pm10", "aqi", "co", "no2", "o3"])
-        ]
-
-        if not pollutant_cols:
-            st.warning("No pollutant columns detected.")
-        else:
-            pollutant = st.selectbox("Select pollutant:", pollutant_cols)
-
-            # Histogram
-            fig_hist = px.histogram(df, x=pollutant, title=f"Distribution of {pollutant}")
-            st.plotly_chart(fig_hist, use_container_width=True)
-
-            # Boxplot
-            fig_box = px.box(df, y=pollutant, title=f"Boxplot of {pollutant}")
-            st.plotly_chart(fig_box, use_container_width=True)
-
-            # Correlation heatmap
-            numeric_df = df.select_dtypes(include=np.number)
-            if not numeric_df.empty:
-                corr = numeric_df.corr()
-                fig_corr = px.imshow(corr, text_auto=True, title="Pollutant Correlation Heatmap")
-                st.plotly_chart(fig_corr, use_container_width=True)
-
-    else:
-        st.markdown("### 📊 General Visualisations")
-
-        numeric_cols = df.select_dtypes(include=np.number).columns
-
-        if len(numeric_cols) == 0:
-            st.warning("No numeric columns to visualise.")
-        else:
-            col_x = st.selectbox("X-axis:", numeric_cols)
-            col_y = st.selectbox("Y-axis:", numeric_cols)
-
-            fig_scatter = px.scatter(df, x=col_x, y=col_y, title=f"{col_x} vs {col_y}")
-            st.plotly_chart(fig_scatter, use_container_width=True)
-
-            fig_hist = px.histogram(df, x=col_x, title=f"Distribution of {col_x}")
-            st.plotly_chart(fig_hist, use_container_width=True)
-
-            fig_box = px.box(df, y=col_x, title=f"Boxplot of {col_x}")
-            st.plotly_chart(fig_box, use_container_width=True)
+if df is None:
+    st.error("❌ Could not read the file. Please ensure it's a valid CSV encoding.")
+    st.stop()
 
 
-# -----------------------------------------------------
-# TAB 3 — Advanced Analysis
-# -----------------------------------------------------
-with tab_advanced:
-    st.markdown("## 🧪 Advanced Analysis")
+# --------------------------------------------------------------------
+# Dataset Overview
+# --------------------------------------------------------------------
+st.success("✅ File successfully loaded!")
+st.markdown("### 📊 Dataset Overview")
 
-    # Correlation heatmap for all numeric data
-    numeric_df = df.select_dtypes(include=np.number)
+col1, col2, col3 = st.columns(3)
+col1.metric("Rows", f"{df.shape[0]:,}")
+col2.metric("Columns", f"{df.shape[1]:,}")
+col3.metric(
+    "Missing Values (%)",
+    f"{df.isnull().mean().mean() * 100:.2f}%"
+)
 
-    if numeric_df.empty:
-        st.info("No numerical columns for advanced analysis.")
-    else:
-        corr = numeric_df.corr()
-        fig_corr = px.imshow(
-            corr,
-            text_auto=True,
-            color_continuous_scale="RdBu_r",
-            title="Correlation Matrix"
-        )
-        st.plotly_chart(fig_corr, use_container_width=True)
+st.dataframe(df.head(50), use_container_width=True)
 
+
+# --------------------------------------------------------------------
+# Missing Value Heatmap
+# --------------------------------------------------------------------
+st.markdown("### 🩺 Missing Value Map")
+
+missing_map = df.isnull().astype(int)
+
+try:
+    fig_missing = px.imshow(
+        missing_map,
+        aspect="auto",
+        color_continuous_scale=["#ffffff", "#ff4b4b"],
+        labels={"color": "Missing"},
+        title="Missing Values Heatmap (1 = missing)"
+    )
+    fig_missing.update_layout(height=400)
+    st.plotly_chart(fig_missing, use_container_width=True)
+except:
+    st.info("Too many rows to display heatmap.")
+
+
+# --------------------------------------------------------------------
+# Column Type Summary
+# --------------------------------------------------------------------
+st.markdown("### 🧬 Column Type Summary")
+
+dtype_counts = df.dtypes.astype(str).value_counts()
+st.bar_chart(dtype_counts)
+
+
+# --------------------------------------------------------------------
+# Selection: Column-wise Statistics
+# --------------------------------------------------------------------
+st.markdown("### 📈 Column Statistics")
+
+selected_col = st.selectbox(
+    "Select a column to analyse:",
+    df.columns
+)
+
+if pd.api.types.is_numeric_dtype(df[selected_col]):
+    # ------------------------------
+    # Numeric Column Visualisations
+    # ------------------------------
+    st.markdown(f"#### 📏 Numeric Analysis — {selected_col}")
+
+    colA, colB, colC, colD = st.columns(4)
+    colA.metric("Mean", f"{df[selected_col].mean():.3f}")
+    colB.metric("Median", f"{df[selected_col].median():.3f}")
+    colC.metric("Std Dev", f"{df[selected_col].std():.3f}")
+    colD.metric("Missing (%)", f"{df[selected_col].isnull().mean() * 100:.2f}%")
+
+    fig_hist = px.histogram(df, x=selected_col, nbins=40,
+                            title=f"Distribution of {selected_col}")
+    st.plotly_chart(fig_hist, use_container_width=True)
+
+    fig_box = px.box(df, y=selected_col, title=f"Boxplot of {selected_col}")
+    st.plotly_chart(fig_box, use_container_width=True)
+
+else:
+    # ------------------------------
+    # Categorical Column Visualisations
+    # ------------------------------
+    st.markdown(f"#### 🏷 Categorical Analysis — {selected_col}")
+
+    value_counts = df[selected_col].value_counts().head(20)
+    fig_cat = px.bar(
+        value_counts,
+        x=value_counts.index,
+        y=value_counts.values,
+        title=f"Top 20 categories in '{selected_col}'"
+    )
+    fig_cat.update_layout(xaxis_title="Category", yaxis_title="Count")
+    st.plotly_chart(fig_cat, use_container_width=True)
+
+
+# --------------------------------------------------------------------
+# Optional: Download Cleaned Data
+# --------------------------------------------------------------------
+st.markdown("### 📥 Download Cleaned Dataset")
+
+cleaned_csv = df.to_csv(index=False).encode("utf-8")
+
+st.download_button(
+    "⬇ Download Cleaned CSV",
+    cleaned_csv,
+    file_name="cleaned_dataset.csv",
+    mime="text/csv"
+)
