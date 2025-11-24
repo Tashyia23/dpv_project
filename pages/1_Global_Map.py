@@ -122,6 +122,18 @@ if view_mode == "After Processing":
 
     fig.update_geos(showframe=False)
     st.plotly_chart(fig, use_container_width=True)
+    
+    # Insight Section
+    mean_val = agg[selected].mean()
+    max_country = agg.loc[agg[selected].idxmax(), "country"]
+    max_val = agg[selected].max()
+
+    st.markdown(f"""
+    ### 📘 Insight  
+    - The processed dataset shows an average **{selected}** value of `{mean_val:.2f}` across all countries.  
+    - **{max_country}** records the highest pollution level after normalisation (`{max_val:.2f}`).  
+    - The processed map displays scaled/cleaned values, enabling more accurate cross-country comparison.  
+    """)
 
     st.stop()
 
