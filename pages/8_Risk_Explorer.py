@@ -337,7 +337,7 @@ fig_dual.update_layout(
     yaxis2=dict(title="Pollutant AQI", overlaying="y", side="right")
 )
 
-st.plotly_chart(fig_dual, use_container_width=True
+st.plotly_chart(fig_dual, use_container_width=True)
 
 with st.expander("📘 Insight — Dual Axis Comparison"):
     st.markdown(f"""
