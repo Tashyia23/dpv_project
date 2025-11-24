@@ -95,7 +95,7 @@ if view_mode.startswith("Before"):
     # -------------------------------------
     # (1) Histogram of raw pollutant values
     # -------------------------------------
-    st.markdown("### 1. Distribution of Raw AQI Values")
+    st.markdown("### Distribution of Raw AQI Values")
     fig_hist = px.histogram(
         raw_g,
         x=selected_pollutant,
@@ -109,7 +109,7 @@ if view_mode.startswith("Before"):
     # -------------------------------------
     # (2) Box Plot
     # -------------------------------------
-    st.markdown("### 2. Box Plot of Raw AQI Values")
+    st.markdown("### Box Plot of Raw AQI Values")
     fig_box = px.box(
         raw_g,
         y=selected_pollutant,
@@ -124,7 +124,7 @@ if view_mode.startswith("Before"):
     # (3) Scatter Map (if lat/lon exist)
     # -------------------------------------
     if {"Latitude", "Longitude"}.issubset(raw_g.columns):
-        st.markdown("### 3. Global Scatter Map of Raw Pollutants")
+        st.markdown("### Global Scatter Map of Raw Pollutants")
 
         fig_map = px.scatter_geo(
             raw_g,
@@ -141,7 +141,7 @@ if view_mode.startswith("Before"):
     # -------------------------------------
     # (4) Correlation Heatmap
     # -------------------------------------
-    st.markdown("### 4. Correlation Heatmap (Raw Dataset)")
+    st.markdown("### Correlation Heatmap (Raw Dataset)")
 
     raw_corr_cols = [c for c in raw_pollutants if raw_g[c].dtype != "object"]
 
@@ -189,7 +189,7 @@ agg_df["risk_percentile"] = agg_df["risk_index"].rank(pct=True)
 # ====================================================================
 # SECTION 1 — RANKING CONTROLS
 # ====================================================================
-st.subheader("1. Country Ranking Controls")
+st.subheader("Country Ranking Controls")
 
 colA, colB = st.columns(2)
 
@@ -229,7 +229,7 @@ metric_col = "risk_index" if metric_mode == "Overall Risk Index" else metric_mod
 # ====================================================================
 # SECTION 2 — RANKING BAR CHART
 # ====================================================================
-st.subheader("2. Ranked Countries (Bar Chart)")
+st.subheader("Ranked Countries (Bar Chart)")
 
 top_n = st.slider("Show Top N Countries", 5, 40, 15)
 plot_df = rank_df.head(top_n)
@@ -248,7 +248,7 @@ st.plotly_chart(fig_rank, use_container_width=True)
 # ====================================================================
 # SECTION 3 — DUAL AXIS
 # ====================================================================
-st.subheader("3. Dual-Axis Comparison (Risk vs Pollutant)")
+st.subheader("Dual-Axis Comparison (Risk vs Pollutant)")
 
 col1, col2 = st.columns(2)
 
@@ -289,7 +289,7 @@ st.plotly_chart(fig_dual, use_container_width=True)
 # ====================================================================
 # SECTION 4 — HEATMAP
 # ====================================================================
-st.subheader("4. Pollutant Heatmap")
+st.subheader("Pollutant Heatmap")
 
 heat_df = agg_df.set_index("country")[proc_pollutants]
 
