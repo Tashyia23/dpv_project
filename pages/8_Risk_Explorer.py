@@ -85,6 +85,15 @@ if view_mode.startswith("Before"):
     fig_raw.update_layout(height=420, xaxis_tickangle=45)
     st.plotly_chart(fig_raw, use_container_width=True)
 
+    with st.expander("📘 Insight — Top 25 Raw AQI Levels"):
+        st.markdown(f"""
+    - This ranking shows the countries with the **highest raw {selected_pollutant} readings**.  
+    - Countries at the top indicate **intense pollution episodes** or **consistently elevated pollution**.  
+    - Large gaps between countries suggest **significant inequality in environmental health exposure**.  
+    - Because this is *raw data*, it may still include **outliers and inconsistencies**.
+        """)
+
+
     # ====================================================================
     # EXTRA CHARTS REQUESTED
     # ====================================================================
@@ -106,6 +115,15 @@ if view_mode.startswith("Before"):
     fig_hist.update_layout(height=300)
     st.plotly_chart(fig_hist, use_container_width=True)
 
+    with st.expander("📘 Insight — Histogram"):
+        st.markdown(f"""
+    - Shows how **{selected_pollutant}** values are distributed globally.  
+    - A **right-skewed** distribution indicates a few locations with **very high pollution**.  
+    - If the majority of values cluster at the low end, it suggests most regions experience **moderate or good air quality**.  
+    - Heavy tails or clumping often indicate **urban hotspots** or **industrial regions**.
+        """)
+
+
     # -------------------------------------
     # (2) Box Plot
     # -------------------------------------
@@ -119,6 +137,14 @@ if view_mode.startswith("Before"):
     )
     fig_box.update_layout(height=300)
     st.plotly_chart(fig_box, use_container_width=True)
+    
+    with st.expander("📘 Insight — Box Plot"):
+        st.markdown(f"""
+    - Highlights **median values**, **spread**, and **extreme outliers**.  
+    - Many outliers above the whiskers may indicate recurring **pollution spikes**.  
+    - A wide IQR shows **large variation across countries**, suggesting uneven environmental conditions.  
+    - A narrow IQR would mean more **uniform exposure** across regions.
+        """)
 
     # -------------------------------------
     # (3) Scatter Map (if lat/lon exist)
@@ -137,6 +163,15 @@ if view_mode.startswith("Before"):
         )
         fig_map.update_layout(height=350)
         st.plotly_chart(fig_map, use_container_width=True)
+        
+        with st.expander("📘 Insight — Global Scatter Map"):
+            st.markdown(f"""
+        - Shows geographic distribution of **{selected_pollutant}**.  
+        - Clusters of red/orange points indicate regions with **persistently high readings**.  
+        - Helps identify spatial hotspots such as **industrial belts**, **densely populated cities**, or **climate-affected zones**.  
+        - Useful for linking patterns to **regional climate**, **season**, or **urbanisation**.
+            """)
+
 
     # -------------------------------------
     # (4) Correlation Heatmap
@@ -157,6 +192,15 @@ if view_mode.startswith("Before"):
         )
         fig_corr.update_layout(height=400)
         st.plotly_chart(fig_corr, use_container_width=True)
+
+        with st.expander("📘 Insight — Correlation Heatmap"):
+            st.markdown("""
+        - High correlation (dark red) indicates pollutants that **increase together**, often due to **shared emission sources**  
+          (e.g., vehicles → PM₂.₅ + NO₂).  
+        - Low or negative correlations suggest pollutants come from **different processes** (e.g., ozone is often sunlight-dependent).  
+        - Strong correlations help identify **multi-pollutant emission profiles** important for policymaking.
+            """)
+
 
     # Final note
     st.info(
@@ -245,6 +289,15 @@ fig_rank = px.bar(
 fig_rank.update_layout(height=450, xaxis_tickangle=45)
 st.plotly_chart(fig_rank, use_container_width=True)
 
+with st.expander("📘 Insight — Country Ranking"):
+    st.markdown(f"""
+    - Countries at the top show **consistently elevated pollutant levels**.  
+    - Comparing *Overall Risk Index* vs specific pollutants helps identify  
+      whether a country suffers from **one dominant pollutant** or **multi-pollutant burden**.  
+    - A steep bar drop indicates **sharp differences in environmental conditions** between countries.
+        """)
+
+
 # ====================================================================
 # SECTION 3 — DUAL AXIS
 # ====================================================================
@@ -284,7 +337,16 @@ fig_dual.update_layout(
     yaxis2=dict(title="Pollutant AQI", overlaying="y", side="right")
 )
 
-st.plotly_chart(fig_dual, use_container_width=True)
+st.plotly_chart(fig_dual, use_container_width=True
+
+with st.expander("📘 Insight — Dual Axis Comparison"):
+    st.markdown(f"""
+- Bar height shows the overall **composite risk**, while the line shows **actual pollutant concentration**.  
+- If the line closely follows the bars, this pollutant is likely a **strong driver of risk**.  
+- Wide gaps between the bar and line suggest **other pollutants** contribute more to the risk index.  
+- Useful for identifying **which pollutant should be prioritised** for improvement.
+    """)
+
 
 # ====================================================================
 # SECTION 4 — HEATMAP
@@ -300,6 +362,14 @@ fig_heat = px.imshow(
     title="Pollutant Heatmap"
 )
 st.plotly_chart(fig_heat, use_container_width=True)
+
+with st.expander("📘 Insight — Pollutant Heatmap"):
+    st.markdown("""
+- A country row that is consistently dark suggests a **multi-pollutant hotspot**.  
+- Vertical dark columns indicate pollutants that are **problematic globally**.  
+- Helps quickly spot **regional pollution profiles** and **global trends**.
+    """)
+
 
 # ====================================================================
 # SECTION 5 — RADAR CHART
@@ -332,3 +402,13 @@ if compare_list:
     )
 
     st.plotly_chart(fig_radar, use_container_width=True)
+    
+    with st.expander("📘 Insight — Radar Chart Comparison"):
+    st.markdown("""
+    - The shape of each country’s radar plot shows its **pollution signature**.  
+    - Wide, filled areas indicate **high exposure across many pollutants**.  
+    - A spiky pattern suggests **one main pollutant** is the primary concern.  
+    - Effective for side-by-side comparison of **pollution patterns and environmental burden**.
+        """)
+    
+
