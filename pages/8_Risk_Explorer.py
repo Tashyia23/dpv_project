@@ -10,21 +10,20 @@ from utils.data_loader import (
     load_processed_dataset
 )
 from utils.ui import header
-from utils.regions import assign_region
+    from utils.regions import assign_region
 
-# Function to load custom CSS (ensure it's loaded for every page)
+# Function to load custom CSS
 def load_css():
     with open("styles/custom.css") as f:
         st.markdown(f"<style>{f.read()}</style>", unsafe_allow_html=True)
 
-# Load the CSS in each page (this ensures the styles are applied across pages)
 load_css()
 
 st.set_page_config(layout="wide")
 
-# --------------------------------------------------------------------
-# LOAD RAW + PROCESSED DATASETS
-# --------------------------------------------------------------------
+# -------------------------------------------------------------
+# LOAD DATASETS
+# -------------------------------------------------------------
 raw_g, raw_pm25 = load_raw_dataset()
 processed_df = load_processed_dataset()
 
@@ -32,7 +31,6 @@ if raw_g is None or processed_df is None:
     st.error("❌ Dataset is empty or failed to load.")
     st.stop()
 
-# Standardize naming for raw dataset
 if "Country" not in raw_g.columns:
     st.error("❌ Raw dataset requires a 'Country' column.")
     st.stop()
@@ -50,25 +48,22 @@ header(
 raw_pollutants = [c for c in raw_g.columns if any(x in c.lower() for x in ["aqi", "value"]) and "category" not in c.lower()]
 proc_pollutants = [c for c in processed_df.columns if c.endswith("_aqi_value")]
 
-# --------------------------------------------------------------------
-# BEFORE / AFTER TOGGLE
-# --------------------------------------------------------------------
+# -------------------------------------------------------------
+# MODE SELECTOR
+# -------------------------------------------------------------
 view_mode = st.radio(
     "Select Data Mode:",
     ["Before Processing (Raw AQI)", "After Processing (Normalised Risk Index)"],
     horizontal=True
 )
 
-# ====================================================================
-# MODE 1 — BEFORE PROCESSING (RAW AQI)
-# ====================================================================
+# =============================================================
+# MODE 1 — RAW BEFORE PROCESSING
+# =============================================================
 if view_mode.startswith("Before"):
 
     st.subheader("🌫 Raw AQI — Before Processing")
 
-    # -----------------------------
-    # Simple pollutant selector
-    # -----------------------------
     selected_pollutant = st.selectbox("Select pollutant:", raw_pollutants)
 
     raw_agg = raw_g.groupby("Country", as_index=False)[selected_pollutant].mean()
@@ -87,23 +82,16 @@ if view_mode.startswith("Before"):
 
     with st.expander("📘 Insight — Top 25 Raw AQI Levels"):
         st.markdown(f"""
-    - This ranking shows the countries with the **highest raw {selected_pollutant} readings**.  
-    - Countries at the top indicate **intense pollution episodes** or **consistently elevated pollution**.  
-    - Large gaps between countries suggest **significant inequality in environmental health exposure**.  
-    - Because this is *raw data*, it may still include **outliers and inconsistencies**.
+- Countries at the top experience **intense pollution** for {selected_pollutant}.  
+- Large gaps in bar heights reflect **inequality in environmental exposure**.  
+- Raw data may include **outliers and missing/unclean values**.  
         """)
 
-
-    # ====================================================================
-    # EXTRA CHARTS REQUESTED
-    # ====================================================================
-
+    # ---------------------------------------------------------
     st.markdown("---")
     st.subheader("📌 Additional Raw AQI Insights")
 
-    # -------------------------------------
-    # (1) Histogram of raw pollutant values
-    # -------------------------------------
+    # Histogram
     st.markdown("### Distribution of Raw AQI Values")
     fig_hist = px.histogram(
         raw_g,
@@ -112,21 +100,16 @@ if view_mode.startswith("Before"):
         color_discrete_sequence=["#6366f1"],
         title=f"Distribution of {selected_pollutant}"
     )
-    fig_hist.update_layout(height=300)
     st.plotly_chart(fig_hist, use_container_width=True)
 
     with st.expander("📘 Insight — Histogram"):
         st.markdown(f"""
-    - Shows how **{selected_pollutant}** values are distributed globally.  
-    - A **right-skewed** distribution indicates a few locations with **very high pollution**.  
-    - If the majority of values cluster at the low end, it suggests most regions experience **moderate or good air quality**.  
-    - Heavy tails or clumping often indicate **urban hotspots** or **industrial regions**.
+- Right-skewed distribution = **few very polluted areas**.  
+- Clustering at low values = **generally good/moderate air quality** worldwide.  
+- Heavy tails suggest **urban or industrial hotspots**.  
         """)
 
-
-    # -------------------------------------
-    # (2) Box Plot
-    # -------------------------------------
+    # Box plot
     st.markdown("### Box Plot of Raw AQI Values")
     fig_box = px.box(
         raw_g,
@@ -135,23 +118,18 @@ if view_mode.startswith("Before"):
         color_discrete_sequence=["#ef4444"],
         title=f"Box Plot — {selected_pollutant}"
     )
-    fig_box.update_layout(height=300)
     st.plotly_chart(fig_box, use_container_width=True)
-    
+
     with st.expander("📘 Insight — Box Plot"):
         st.markdown(f"""
-    - Highlights **median values**, **spread**, and **extreme outliers**.  
-    - Many outliers above the whiskers may indicate recurring **pollution spikes**.  
-    - A wide IQR shows **large variation across countries**, suggesting uneven environmental conditions.  
-    - A narrow IQR would mean more **uniform exposure** across regions.
+- Outliers represent **extreme pollution spikes**.  
+- Wide IQR = **uneven air quality conditions across countries**.  
+- Narrow IQR = **more uniform global exposure**.  
         """)
 
-    # -------------------------------------
-    # (3) Scatter Map (if lat/lon exist)
-    # -------------------------------------
+    # Scatter geo
     if {"Latitude", "Longitude"}.issubset(raw_g.columns):
-        st.markdown("### Global Scatter Map of Raw Pollutants")
-
+        st.markdown("### Global Scatter Map")
         fig_map = px.scatter_geo(
             raw_g,
             lat="Latitude",
@@ -161,25 +139,19 @@ if view_mode.startswith("Before"):
             color_continuous_scale="Reds",
             title=f"Global Map — Raw {selected_pollutant}"
         )
-        fig_map.update_layout(height=350)
         st.plotly_chart(fig_map, use_container_width=True)
-        
+
         with st.expander("📘 Insight — Global Scatter Map"):
             st.markdown(f"""
-        - Shows geographic distribution of **{selected_pollutant}**.  
-        - Clusters of red/orange points indicate regions with **persistently high readings**.  
-        - Helps identify spatial hotspots such as **industrial belts**, **densely populated cities**, or **climate-affected zones**.  
-        - Useful for linking patterns to **regional climate**, **season**, or **urbanisation**.
+- Shows spatial hotspots for **{selected_pollutant}**.  
+- Dense clusters → **major cities, industrial regions**.  
+- Useful for linking pollution to **geography, climate, and urbanisation**.  
             """)
 
-
-    # -------------------------------------
-    # (4) Correlation Heatmap
-    # -------------------------------------
+    # Correlation heatmap
     st.markdown("### Correlation Heatmap (Raw Dataset)")
 
     raw_corr_cols = [c for c in raw_pollutants if raw_g[c].dtype != "object"]
-
     if len(raw_corr_cols) >= 2:
         corr = raw_g[raw_corr_cols].corr()
 
@@ -190,32 +162,23 @@ if view_mode.startswith("Before"):
             color_continuous_scale="RdBu_r",
             title="Correlation Between Raw Pollutants"
         )
-        fig_corr.update_layout(height=400)
         st.plotly_chart(fig_corr, use_container_width=True)
 
         with st.expander("📘 Insight — Correlation Heatmap"):
             st.markdown("""
-        - High correlation (dark red) indicates pollutants that **increase together**, often due to **shared emission sources**  
-          (e.g., vehicles → PM₂.₅ + NO₂).  
-        - Low or negative correlations suggest pollutants come from **different processes** (e.g., ozone is often sunlight-dependent).  
-        - Strong correlations help identify **multi-pollutant emission profiles** important for policymaking.
+- High correlation → **same emission sources** (e.g., vehicles → NO₂ + PM2.5).  
+- Low/negative correlation → **different atmospheric behaviours**.  
+- Helps identify **pollutant clusters** for policymaking.  
             """)
 
-
-    # Final note
-    st.info(
-        "You are currently viewing **raw AQI data before any cleaning**.\n\n"
-        "Switch to **After Processing** to explore the normalized composite risk index, "
-        "country rankings, radar charts, heatmaps, and dual-axis analytics."
-    )
-
+    st.info("Switch to **After Processing** for the normalised composite risk index.")
     st.stop()
 
-# ====================================================================
-# MODE 2 — AFTER PROCESSING (NORMALISED RISK INDEX)
-# ====================================================================
+# =============================================================
+# MODE 2 — AFTER PROCESSING
+# =============================================================
 
-# Compute mean pollutant values
+# Mean pollutant levels
 agg_df = processed_df[["country"] + proc_pollutants].groupby("country").mean().reset_index()
 
 # Normalise
@@ -226,23 +189,18 @@ for col in proc_pollutants:
     scaled[col] = (s - lo) / (hi - lo) if hi > lo else np.zeros_like(s)
 
 scaled_df = pd.DataFrame(scaled)
-
 agg_df["risk_index"] = scaled_df.mean(axis=1)
 agg_df["risk_percentile"] = agg_df["risk_index"].rank(pct=True)
 
-# ====================================================================
-# SECTION 1 — RANKING CONTROLS
-# ====================================================================
+# SECTION 1 – CONTROLS
 st.subheader("Country Ranking Controls")
 
 colA, colB = st.columns(2)
-
 with colA:
     ranking_mode = st.selectbox(
         "Risk Ranking Mode",
         ["Highest Risk", "Lowest Risk", "Middle Range", "Custom Percentile Range"]
     )
-
 with colB:
     metric_mode = st.selectbox(
         "Plot Metric",
@@ -250,7 +208,7 @@ with colB:
     )
 
 if ranking_mode == "Custom Percentile Range":
-    pct_min, pct_max = st.slider("Select Percentile Range", 0.0, 1.0, (0.20, 0.80), 0.01)
+    pct_min, pct_max = st.slider("Filter Percentile Range", 0.0, 1.0, (0.20, 0.80), 0.01)
 else:
     pct_min, pct_max = 0.0, 1.0
 
@@ -270,9 +228,7 @@ elif ranking_mode == "Custom Percentile Range":
 
 metric_col = "risk_index" if metric_mode == "Overall Risk Index" else metric_mode
 
-# ====================================================================
 # SECTION 2 — RANKING BAR CHART
-# ====================================================================
 st.subheader("Ranked Countries (Bar Chart)")
 
 top_n = st.slider("Show Top N Countries", 5, 40, 15)
@@ -291,23 +247,17 @@ st.plotly_chart(fig_rank, use_container_width=True)
 
 with st.expander("📘 Insight — Country Ranking"):
     st.markdown(f"""
-    - Countries at the top show **consistently elevated pollutant levels**.  
-    - Comparing *Overall Risk Index* vs specific pollutants helps identify  
-      whether a country suffers from **one dominant pollutant** or **multi-pollutant burden**.  
-    - A steep bar drop indicates **sharp differences in environmental conditions** between countries.
-        """)
+- Higher bars = **greater pollution burden**.  
+- Shows whether risk is due to **one dominant pollutant** or **multiple pollutants**.  
+- Helps prioritise **policy focus areas**.  
+    """)
 
-
-# ====================================================================
 # SECTION 3 — DUAL AXIS
-# ====================================================================
 st.subheader("Dual-Axis Comparison (Risk vs Pollutant)")
 
 col1, col2 = st.columns(2)
-
 with col1:
     pollutant_choice = st.selectbox("Select Pollutant:", proc_pollutants)
-
 with col2:
     dual_n = st.slider("Number of Countries", 5, 25, 10)
 
@@ -341,16 +291,12 @@ st.plotly_chart(fig_dual, use_container_width=True)
 
 with st.expander("📘 Insight — Dual Axis Comparison"):
     st.markdown(f"""
-- Bar height shows the overall **composite risk**, while the line shows **actual pollutant concentration**.  
-- If the line closely follows the bars, this pollutant is likely a **strong driver of risk**.  
-- Wide gaps between the bar and line suggest **other pollutants** contribute more to the risk index.  
-- Useful for identifying **which pollutant should be prioritised** for improvement.
+- Bars = **overall risk**; line = **specific pollutant concentration**.  
+- When line and bars move together → pollutant strongly drives risk.  
+- When they differ → other pollutants are contributing more.  
     """)
 
-
-# ====================================================================
 # SECTION 4 — HEATMAP
-# ====================================================================
 st.subheader("Pollutant Heatmap")
 
 heat_df = agg_df.set_index("country")[proc_pollutants]
@@ -365,15 +311,12 @@ st.plotly_chart(fig_heat, use_container_width=True)
 
 with st.expander("📘 Insight — Pollutant Heatmap"):
     st.markdown("""
-- A country row that is consistently dark suggests a **multi-pollutant hotspot**.  
-- Vertical dark columns indicate pollutants that are **problematic globally**.  
-- Helps quickly spot **regional pollution profiles** and **global trends**.
+- Darker rows = **multi-pollutant hotspots**.  
+- Dark columns = **globally problematic pollutants**.  
+- Useful for identifying **pollution signatures** by region.  
     """)
 
-
-# ====================================================================
 # SECTION 5 — RADAR CHART
-# ====================================================================
 st.subheader("5. Radar Chart — Compare Countries")
 
 compare_list = st.multiselect(
@@ -402,13 +345,10 @@ if compare_list:
     )
 
     st.plotly_chart(fig_radar, use_container_width=True)
-    
-    with st.expander("📘 Insight — Radar Chart Comparison"):
-    st.markdown("""
-    - The shape of each country’s radar plot shows its **pollution signature**.  
-    - Wide, filled areas indicate **high exposure across many pollutants**.  
-    - A spiky pattern suggests **one main pollutant** is the primary concern.  
-    - Effective for side-by-side comparison of **pollution patterns and environmental burden**.
-        """)
-    
 
+    with st.expander("📘 Insight — Radar Chart Comparison"):
+        st.markdown("""
+- Wide radar shape = **high pollution across many pollutants**.  
+- Spiky shape = **one main pollutant dominates**.  
+- Great for understanding **pollution fingerprints** of each country.  
+        """)
