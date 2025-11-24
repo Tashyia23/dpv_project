@@ -1,6 +1,15 @@
 import streamlit as st
+import os
 import plotly.express as px
 import pandas as pd
+
+# Function to load custom CSS (ensure it's loaded for every page)
+def load_css():
+    with open("styles/custom.css") as f:
+        st.markdown(f"<style>{f.read()}</style>", unsafe_allow_html=True)
+
+# Load the CSS in each page (this ensures the styles are applied across pages)
+load_css()
 
 from utils.data_loader import load_raw_dataset, load_processed_dataset
 
@@ -145,4 +154,6 @@ if view_mode == "Compare Before vs After":
 
     st.write("### After Processing")
     st.dataframe(summary_after)
+
+    
 
