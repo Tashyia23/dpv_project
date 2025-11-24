@@ -154,7 +154,6 @@ if view_mode.startswith("Before"):
     # Raw pollutant columns & WHO thresholds (AQI-approx equivalents)
     raw_pollutant_info = {
         "PM2.5 AQI Value": ("🟤", "PM2.5 (Fine Particles)", 25),
-        "PM10 AQI Value": ("🟠", "PM10 (Coarse Particles)", 50),
         "NO2 AQI Value": ("💛", "NO₂ (Nitrogen Dioxide)", 33),
         "Ozone AQI Value": ("💜", "O₃ (Ozone)", 70),
         "CO AQI Value": ("🔥", "CO (Carbon Monoxide)", 50),
@@ -379,7 +378,6 @@ st.markdown("### 1. Configure Risk Score (Processed Dataset)")
 # Pollutant metadata for processed dataset
 pollutant_info = {
     "pm25_aqi_value": ("🟤", "PM2.5 (Fine Particles)"),
-    "pm10_aqi_value": ("🟠", "PM10 (Coarse Particles)"),
     "no2_aqi_value": ("💛", "NO₂ (Nitrogen Dioxide)"),
     "ozone_aqi_value": ("💜", "O₃ (Ozone)"),
     "co_aqi_value": ("🔥", "CO (Carbon Monoxide)"),
@@ -516,6 +514,7 @@ def classify_health(idx):
 
 agg_df["who_health_level"] = agg_df["who_health_index"].apply(classify_health)
 
+# Create the WHO Health Impact map
 who_fig = px.choropleth(
     agg_df,
     locations="country",
@@ -524,7 +523,20 @@ who_fig = px.choropleth(
     color_continuous_scale=["green", "yellow", "orange", "red", "darkred"],
     title="WHO Health Impact Index (Processed AQI, After Processing)",
 )
-who_fig.update_layout(height=450, margin=dict(l=0, r=0, t=40, b=0))
+
+# Update the layout with custom legend labels
+who_fig.update_layout(
+    height=450, 
+    margin=dict(l=0, r=0, t=40, b=0),
+    coloraxis_colorbar=dict(
+        title="Health Impact",
+        tickvals=[1, 2, 3, 4],  # These are the numeric values on the color scale
+        ticktext=["Good", "Moderate", "High", "Very High"],  # Custom labels for the color scale
+        tickmode='array',  # Ensures that the ticks follow the array given
+    )
+)
+
+# Display the figure
 st.plotly_chart(who_fig, use_container_width=True)
 
 # ====================================================================================
@@ -825,7 +837,6 @@ pollutant_choices = {
     "NO₂ (Nitrogen Dioxide)": "no2_aqi_value",
     "O₃ (Ozone)": "ozone_aqi_value",
     "CO (Carbon Monoxide)": "co_aqi_value",
-    "PM₁₀ (Coarse Particles)": "pm10_aqi_value",
 }
 
 pollutant_selected = st.selectbox(
@@ -879,6 +890,14 @@ fig = px.bar(
 fig.update_layout(height=450, margin=dict(l=0, r=0, t=40, b=0))
 fig.update_xaxes(tickangle=45)
 st.plotly_chart(fig, use_container_width=True)
+
+fig.update_layout(
+    coloraxis_colorbar=dict(
+        title="Health Impact",  # Title for the color bar
+        tickvals=[1, 2, 3, 4],  # Numeric values corresponding to the color scale
+        ticktext=["Good", "Moderate", "High", "Very High"],  # Custom labels for the scale
+    )
+)
 
 with st.expander("Show full ranking data"):
     st.dataframe(final_df)
