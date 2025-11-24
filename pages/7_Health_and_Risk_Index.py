@@ -1,4 +1,5 @@
 import streamlit as st
+import os
 import numpy as np
 import pandas as pd
 import plotly.express as px
@@ -7,6 +8,14 @@ from utils.data_loader import load_raw_dataset, load_processed_dataset
 from utils.ui import header
 
 import streamlit.components.v1 as components
+
+# Function to load custom CSS (ensure it's loaded for every page)
+def load_css():
+    with open("styles/custom.css") as f:
+        st.markdown(f"<style>{f.read()}</style>", unsafe_allow_html=True)
+
+# Load the CSS in each page (this ensures the styles are applied across pages)
+load_css()
 
 
 st.set_page_config(layout="wide")
