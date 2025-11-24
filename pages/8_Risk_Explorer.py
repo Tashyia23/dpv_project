@@ -11,7 +11,7 @@ from utils.data_loader import (
 )
 
 from utils.ui import header
-    from utils.regions import assign_region
+from utils.regions import assign_region
 
 # Function to load custom CSS
 def load_css():
