@@ -412,115 +412,150 @@ with tab_compare:
 # -------------------------------------------------------------------
 # TAB 4 — SNAPSHOT AQI BY CITY (Processed AQI)
 # -------------------------------------------------------------------
-with tab_city:
+# -------------------------------------------------------------------
+# TAB 4 — SNAPSHOT AQI BY CITY
+# -------------------------------------------------------------------
+tab_snapshot = st.tabs(["🏙 Snapshot AQI by City"])[0]
+
+with tab_snapshot:
+
     st.markdown("## 🏙 Snapshot AQI by City")
+    st.write("Analyze AQI values across cities using the processed AQI dataset.")
 
-    # Load processed AQI dataset directly from uploaded file
-    try:
-        aqi_df = pd.read_csv("/mnt/data/global_air_pollution.csv")
-    except:
-        st.error("Processed AQI dataset not found.")
+    # ---------------------------------------------------------------
+    # Load city-level AQI dataset (your uploaded file)
+    # ---------------------------------------------------------------
+    def load_city_aqi():
+        candidates = [
+            "/mnt/data/global_air_pollution.csv",
+            "data/global_air_pollution.csv",
+            "data/raw/global_air_pollution.csv",
+            "global_air_pollution.csv",
+        ]
+        for path in candidates:
+            if os.path.exists(path):
+                try:
+                    df = pd.read_csv(path)
+                    return df
+                except:
+                    pass
+        return None
+
+    city_df = load_city_aqi()
+
+    if city_df is None or city_df.empty:
+        st.error("❌ Processed AQI dataset not found (`global_air_pollution.csv`).")
         st.stop()
 
+    # ---------------------------------------------------------------
     # Clean column names
-    aqi_df.columns = [c.strip() for c in aqi_df.columns]
+    # ---------------------------------------------------------------
+    rename_map = {
+        "Country": "country",
+        "City": "city",
+        "AQI Value": "aqi",
+        "CO AQI Value": "co",
+        "Ozone AQI Value": "ozone",
+        "NO2 AQI Value": "no2",
+        "PM2.5 AQI Value": "pm25",
+        "PM2.5 AQI Category": "pm25_cat",
+        "NO2 AQI Category": "no2_cat",
+        "Ozone AQI Category": "ozone_cat",
+        "CO AQI Category": "co_cat",
+    }
+    city_df = city_df.rename(columns=rename_map)
 
-    required_cols = ["Country", "City"]
-    if not all(col in aqi_df.columns for col in required_cols):
-        st.error("Processed AQI dataset missing Country/City columns.")
-        st.stop()
+    # Identify pollutant columns
+    pollutant_cols = ["pm25", "no2", "ozone", "co", "aqi"]
+    pollutant_options = {
+        "🌫 PM₂.₅ (Fine Particles)": "pm25",
+        "🟧 NO₂": "no2",
+        "💜 Ozone (O₃)": "ozone",
+        "🔥 CO": "co",
+        "⭐ Overall AQI": "aqi",
+    }
 
-    # Select country
-    countries = sorted(aqi_df["Country"].dropna().unique())
-    selected_country = st.selectbox("Select Country:", countries, key="city_country")
-
-    # Select city
-    city_list = sorted(
-        aqi_df[aqi_df["Country"] == selected_country]["City"].dropna().unique()
+    # ---------------------------------------------------------------
+    # User selection
+    # ---------------------------------------------------------------
+    pollutant_label = st.selectbox(
+        "Choose pollutant:",
+        list(pollutant_options.keys()),
     )
-    selected_city = st.selectbox("Select City:", city_list, key="city_name")
+    pollutant_col = pollutant_options[pollutant_label]
 
-    # Filter row
-    row = aqi_df[
-        (aqi_df["Country"] == selected_country) &
-        (aqi_df["City"] == selected_city)
-    ].head(1)
-
-    if row.empty:
-        st.warning("No AQI data available for this city.")
-        st.stop()
-
-    pollutant_cols = [
-        "PM2.5 AQI Value", "PM10 AQI Value", "NO2 AQI Value",
-        "Ozone AQI Value", "CO AQI Value"
-    ]
-    available = [c for c in pollutant_cols if c in aqi_df.columns]
-
-    pollutant_values = row[available].iloc[0].astype(float)
-
-    st.markdown(f"### 🌬 AQI Snapshot: **{selected_city}**, {selected_country}")
-
-    # ---------------------------
-    # BAR CHART
-    # ---------------------------
-    bar_df = pd.DataFrame({
-        "Pollutant": available,
-        "AQI": pollutant_values.values
-    })
-
-    fig_bar = px.bar(
-        bar_df,
-        x="Pollutant",
-        y="AQI",
-        color="AQI",
-        color_continuous_scale="Reds",
-        title=f"AQI Levels in {selected_city}",
+    top_n = st.slider(
+        "Show top N most polluted cities",
+        5, 50, 15
     )
-    fig_bar.update_layout(height=350)
-    st.plotly_chart(fig_bar, use_container_width=True)
 
-    # ---------------------------
-    # RADAR CHART
-    # ---------------------------
-    fig_radar = go.Figure()
-    fig_radar.add_trace(go.Scatterpolar(
-        r=pollutant_values.values,
-        theta=available,
-        fill="toself",
-        line=dict(color="#F43F5E"),
-        name="AQI Levels"
-    ))
-    fig_radar.update_layout(
-        title="Pollution Profile (Radar Chart)",
-        polar=dict(radialaxis=dict(visible=True)),
-        height=450
+    # ---------------------------------------------------------------
+    # Top-N Most Polluted Cities (bar chart)
+    # ---------------------------------------------------------------
+    st.markdown(f"### 🌆 Top {top_n} Most Polluted Cities — {pollutant_label}")
+
+    plot_df = (
+        city_df[["country", "city", pollutant_col]]
+        .dropna()
+        .sort_values(by=pollutant_col, ascending=False)
+        .head(top_n)
     )
-    st.plotly_chart(fig_radar, use_container_width=True)
 
-    # ---------------------------
-    # CATEGORY BADGES
-    # ---------------------------
-    st.markdown("### 📛 AQI Category Summary")
+    fig_top = go.Figure(
+        go.Bar(
+            x=plot_df["city"],
+            y=plot_df[pollutant_col],
+            marker_color="#ef4444",
+        )
+    )
+    fig_top.update_layout(
+        height=420,
+        xaxis_title="City",
+        yaxis_title=f"{pollutant_label}",
+        title=f"Top {top_n} Cities by {pollutant_label}",
+        xaxis_tickangle=45
+    )
+    st.plotly_chart(fig_top, use_container_width=True)
 
-    category_cols = [c.replace("Value", "Category") for c in available]
+    # ---------------------------------------------------------------
+    # AQI Category Distribution
+    # ---------------------------------------------------------------
+    st.markdown("### 🟩 AQI Category Distribution")
 
-    for val_col, cat_col in zip(available, category_cols):
-        if cat_col in row.columns:
-            cat = row[cat_col].iloc[0]
-            val = float(row[val_col].iloc[0])
-            st.markdown(
-                f"""
-                <div style='padding:10px;margin:8px 0;border-radius:8px;
-                background:#f3f4f6;border:1px solid #e5e7eb;'>
-                    <b>{val_col.replace(" AQI Value","")}</b>:  
-                    <span style='color:#dc2626;font-weight:700;'>{val}</span>  
-                    — <i>{cat}</i>
-                </div>
-                """,
-                unsafe_allow_html=True
+    if "AQI Category" in city_df.columns:
+        cat_counts = city_df["AQI Category"].value_counts()
+
+        fig_pi = go.Figure(
+            go.Pie(
+                labels=cat_counts.index,
+                values=cat_counts.values,
+                hole=0.4
             )
+        )
+        fig_pi.update_layout(height=380)
+        st.plotly_chart(fig_pi, use_container_width=True)
 
-    st.info(
-        "This section shows **current AQI levels** for each pollutant, not a time series. "
-        "Use the tabs above to explore PM₂.₅ trends over time."
-    )
+    # ---------------------------------------------------------------
+    # City Map (if lat/lon exist)
+    # ---------------------------------------------------------------
+    if {"Latitude", "Longitude"}.issubset(city_df.columns):
+        st.markdown("### 🗺 City-Level Pollution Map")
+
+        fig_map = px.scatter_geo(
+            city_df,
+            lat="Latitude",
+            lon="Longitude",
+            size=pollutant_col,
+            color=pollutant_col,
+            hover_name="city",
+            color_continuous_scale="Reds",
+        )
+        fig_map.update_layout(height=520)
+        st.plotly_chart(fig_map, use_container_width=True)
+
+    # ---------------------------------------------------------------
+    # Raw table
+    # ---------------------------------------------------------------
+    st.markdown("### 📄 Full City-Level AQI Table")
+    st.dataframe(city_df, use_container_width=True)
+
