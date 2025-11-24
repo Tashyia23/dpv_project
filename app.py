@@ -3,6 +3,30 @@ from utils.loader import load_base_data, load_pm25_data
 from utils.ui import header
 from utils.loader import load_master_data
 
+st.markdown("""
+<style>
+/* Capitalise sidebar text */
+section[data-testid="stSidebar"] .css-1wvsk4l, 
+section[data-testid="stSidebar"] .css-1v0mbdj, 
+section[data-testid="stSidebar"] .css-1d391kg {
+    text-transform: capitalize !important;
+}
+
+/* Make sidebar items cleaner */
+section[data-testid="stSidebar"] .css-1d391kg {
+    font-size: 1rem !important;
+    padding: 6px 4px !important;
+}
+
+/* Highlight selected page */
+section[data-testid="stSidebar"] [aria-current="page"] {
+    background-color: #EEF2FF !important;
+    border-radius: 6px !important;
+    font-weight: 700 !important;
+}
+</style>
+""", unsafe_allow_html=True)
+
 
 st.set_page_config(
     page_title="Global Air Pollution Dashboard",
