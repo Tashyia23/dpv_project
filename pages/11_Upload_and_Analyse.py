@@ -544,3 +544,117 @@ with tab_dashboard:
         "- Time series uses any detected **Year/Date** column.\n"
         "- Relative risk index is a **0–1 normalisation** of the selected metric within this dataset."
     )
+
+# ===============================================================
+# 📄 PDF EXPORT SECTION — FULL REPORT GENERATION
+# ===============================================================
+
+from reportlab.lib.pagesizes import A4
+from reportlab.pdfgen import canvas
+from reportlab.lib.utils import ImageReader
+import tempfile
+import io
+
+st.header("📄 Export Report as PDF")
+
+export_pdf = st.button("📥 Generate PDF Report")
+
+if export_pdf:
+
+    # -----------------------------------------------------------
+    # TEMP FILE TO STORE PDF
+    # -----------------------------------------------------------
+    tmp_pdf = tempfile.NamedTemporaryFile(delete=False, suffix=".pdf")
+    c = canvas.Canvas(tmp_pdf.name, pagesize=A4)
+    width, height = A4
+
+    # -----------------------------------------------------------
+    # TITLE PAGE
+    # -----------------------------------------------------------
+    c.setFont("Helvetica-Bold", 20)
+    c.drawString(40, height - 80, "Data Processing & Visualisation Report")
+
+    c.setFont("Helvetica", 14)
+    c.drawString(40, height - 120, "Generated from Upload & Analyse Module")
+
+    c.setFont("Helvetica", 10)
+    c.drawString(40, height - 150, "Includes:")
+    c.drawString(60, height - 165, "- Cleaning Summary")
+    c.drawString(60, height - 180, "- Feature Engineering Summary")
+    c.drawString(60, height - 195, "- Visualisations Exported as Images")
+
+    c.showPage()
+
+    # -----------------------------------------------------------
+    # CLEANING SUMMARY
+    # -----------------------------------------------------------
+    c.setFont("Helvetica-Bold", 16)
+    c.drawString(40, height - 60, "🧹 Cleaning Summary")
+
+    c.setFont("Helvetica", 11)
+    if clean_choice:
+        top = height - 100
+        c.drawString(40, top, "Cleaning Steps Applied:")
+
+        for step in clean_choice:
+            top -= 18
+            c.drawString(60, top, f"- {step}")
+    else:
+        c.drawString(40, height - 100, "No cleaning operations were applied.")
+
+    c.showPage()
+
+    # -----------------------------------------------------------
+    # FEATURE ENGINEERING SUMMARY
+    # -----------------------------------------------------------
+    c.setFont("Helvetica-Bold", 16)
+    c.drawString(40, height - 60, "🧪 Feature Engineering Summary")
+
+    if feat_choice:
+        top = height - 100
+        c.setFont("Helvetica", 11)
+        for step in feat_choice:
+            c.drawString(60, top, f"- {step}")
+            top -= 18
+    else:
+        c.drawString(40, height - 100, "No feature engineering applied.")
+
+    c.showPage()
+
+    # -----------------------------------------------------------
+    # CHARTS EXPORT
+    # Grab charts from Streamlit (convert to PNG)
+    # -----------------------------------------------------------
+    c.setFont("Helvetica-Bold", 16)
+    c.drawString(40, height - 60, "📊 Visualisations")
+
+    chart_objects = st.session_state.get("export_charts", [])  # uses exported charts
+    top = height - 100
+
+    if chart_objects:
+        for idx, fig in enumerate(chart_objects):
+            png_bytes = fig.to_image(format="png")
+            img = ImageReader(io.BytesIO(png_bytes))
+
+            c.drawImage(img, 40, top - 250, width=500, height=250, preserveAspectRatio=True)
+            top -= 320
+
+            if top < 120:
+                c.showPage()
+                top = height - 100
+    else:
+        c.setFont("Helvetica", 11)
+        c.drawString(40, height - 100, "No charts exported.")
+
+    c.save()
+
+    # -----------------------------------------------------------
+    # STREAMLIT DOWNLOAD BUTTON
+    # -----------------------------------------------------------
+    with open(tmp_pdf.name, "rb") as f:
+        st.download_button(
+            label="📥 Download PDF Report",
+            data=f,
+            file_name="data_visualisation_report.pdf",
+            mime="application/pdf",
+        )
