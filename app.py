@@ -1,4 +1,5 @@
 import streamlit as st
+import os
 from utils.loader import load_base_data, load_pm25_data
 from utils.ui import header
 from utils.loader import load_master_data
@@ -12,6 +13,8 @@ st.set_page_config(
 def load_css():
     with open("styles/custom.css") as f:
         st.markdown(f"<style>{f.read()}</style>", unsafe_allow_html=True)
+
+load_css()
         
 # ---------------------------------------------------------
 # Hero Section
