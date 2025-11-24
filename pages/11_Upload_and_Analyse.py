@@ -10,7 +10,8 @@ import pandas as pd
 import numpy as np
 import plotly.express as px
 
-from fpdf import FPDF
+import base64
+import tempfile
 
 from utils.ui import header
 
@@ -557,97 +558,108 @@ with tab_dashboard:
 # ===============================================================
 # PART 8 — PDF Export using FPDF (Streamlit Cloud compatible)
 # ===============================================================
-from fpdf import FPDF
 
-st.header("📄 Export Report as PDF")
+st.header("📄 Export Report as HTML")
 
-export_pdf = st.button("📥 Generate PDF Report")
+export_html = st.button("📥 Generate HTML Report")
 
-if export_pdf:
+if export_html:
 
-    pdf = FPDF()
-    pdf.set_auto_page_break(auto=True, margin=15)
-
-    # -----------------------------------------------------------
-    # PAGE 1 — TITLE
-    # -----------------------------------------------------------
-    pdf.add_page()
-    pdf.set_font("Arial", "B", 18)
-    pdf.cell(0, 10, "Data Processing & Visualisation Report", ln=True)
-
-    pdf.set_font("Arial", "", 12)
-    pdf.ln(5)
-    pdf.multi_cell(0, 8, "Generated automatically from the Upload & Analyse module.\n")
-    pdf.ln(3)
-    pdf.set_font("Arial", "I", 11)
-    pdf.multi_cell(0, 6, "- Cleaning Summary\n- Feature Engineering Summary\n- Auto-generated insights")
-
-    # -----------------------------------------------------------
-    # PAGE 2 — CLEANING SUMMARY
-    # -----------------------------------------------------------
-    pdf.add_page()
-    pdf.set_font("Arial", "B", 16)
-    pdf.cell(0, 10, "Cleaning Summary", ln=True)
-
-    pdf.set_font("Arial", "", 12)
-
-    if clean_choice:
-        for step in clean_choice:
-            pdf.multi_cell(0, 8, f"- {step}")
-    else:
-        pdf.multi_cell(0, 8, "No cleaning performed.")
-
-    # -----------------------------------------------------------
-    # PAGE 3 — FEATURE ENGINEERING SUMMARY
-    # -----------------------------------------------------------
-    pdf.add_page()
-    pdf.set_font("Arial", "B", 16)
-    pdf.cell(0, 10, "Feature Engineering Summary", ln=True)
-    pdf.set_font("Arial", "", 12)
-
-    if feat_choice:
-        for step in feat_choice:
-            pdf.multi_cell(0, 8, f"- {step}")
-    else:
-        pdf.multi_cell(0, 8, "No feature engineering applied.")
-
-    # -----------------------------------------------------------
-    # PAGE 4 — OPTIONAL CHART IMAGES
-    # -----------------------------------------------------------
-    pdf.add_page()
-    pdf.set_font("Arial", "B", 16)
-    pdf.cell(0, 10, "Visualisations", ln=True)
-    pdf.set_font("Arial", "", 12)
-
+    # -------------------------------------------------------------------
+    # 1. Export charts as base64 PNG
+    # -------------------------------------------------------------------
+    chart_html_blocks = ""
     charts = st.session_state.get("export_charts", [])
-    if charts:
-        for fig in charts:
-            try:
-                img_bytes = fig.to_image(format="png")
-                img_path = tempfile.NamedTemporaryFile(delete=False, suffix=".png").name
-                with open(img_path, "wb") as f:
-                    f.write(img_bytes)
 
-                pdf.ln(5)
-                pdf.image(img_path, w=180)
-            except:
-                pdf.multi_cell(0, 8, "Error exporting a chart.")
-    else:
-        pdf.multi_cell(0, 8, "No charts exported.")
+    for fig in charts:
+        try:
+            png_bytes = fig.to_image(format="png")
+            encoded = base64.b64encode(png_bytes).decode()
 
-    # -----------------------------------------------------------
-    # EXPORT
-    # -----------------------------------------------------------
-    output_path = tempfile.NamedTemporaryFile(delete=False, suffix=".pdf").name
-    pdf.output(output_path)
+            chart_html_blocks += f"""
+                <h4>Visualisation</h4>
+                <img src="data:image/png;base64,{encoded}" style="width: 100%; max-width: 800px; margin-bottom: 20px;" />
+                <hr>
+            """
+        except:
+            chart_html_blocks += "<p><em>Chart could not be exported.</em></p>"
 
-    with open(output_path, "rb") as f:
+    # -------------------------------------------------------------------
+    # 2. Build full HTML document
+    # -------------------------------------------------------------------
+    html_content = f"""
+    <html>
+    <head>
+        <meta charset="UTF-8">
+        <title>Data Visualisation Report</title>
+        <style>
+            body {{
+                font-family: Arial, sans-serif;
+                margin: 40px;
+                line-height: 1.6;
+            }}
+            h1, h2, h3 {{
+                color: #2F3A8E;
+            }}
+            h4 {{
+                margin-top: 30px;
+            }}
+            .section {{
+                margin-bottom: 40px;
+            }}
+            .box {{
+                background: #f5f7ff;
+                padding: 15px;
+                border-left: 5px solid #4153B8;
+                border-radius: 6px;
+                margin-bottom: 20px;
+            }}
+        </style>
+    </head>
+    <body>
+
+        <h1>Data Processing & Visualisation Report</h1>
+        <p>Generated from the Upload & Analyse module.</p>
+        <hr>
+
+        <div class="section">
+            <h2>🧹 Cleaning Summary</h2>
+            <div class="box">
+                {"<br>".join(f"- {s}" for s in clean_choice) if clean_choice else "No cleaning applied."}
+            </div>
+        </div>
+
+        <div class="section">
+            <h2>🧪 Feature Engineering Summary</h2>
+            <div class="box">
+                {"<br>".join(f"- {s}" for s in feat_choice) if feat_choice else "No feature engineering applied."}
+            </div>
+        </div>
+
+        <div class="section">
+            <h2>📊 Visualisations</h2>
+            {chart_html_blocks or "<p>No charts exported.</p>"}
+        </div>
+
+    </body>
+    </html>
+    """
+
+    # -------------------------------------------------------------------
+    # 3. Provide HTML file for download
+    # -------------------------------------------------------------------
+    html_file = tempfile.NamedTemporaryFile(delete=False, suffix=".html")
+    with open(html_file.name, "w", encoding="utf-8") as f:
+        f.write(html_content)
+
+    with open(html_file.name, "rb") as f:
         st.download_button(
-            "📥 Download PDF Report",
-            f,
-            file_name="data_visualisation_report.pdf",
-            mime="application/pdf"
+            "📥 Download HTML Report",
+            data=f,
+            file_name="data_visualisation_report.html",
+            mime="text/html"
         )
 
-    st.success("✅ PDF exported successfully!")
+    st.success("✅ HTML report generated successfully!")
+
 
