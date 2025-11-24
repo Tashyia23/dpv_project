@@ -149,6 +149,142 @@ st.success("✅ File successfully loaded!")
 # Tabs: 1) Overview & Cleaning, 2) Mini Dashboard
 tab_overview, tab_dashboard = st.tabs(["🧹 Overview & Cleaning", "📊 Mini Dashboard"])
 
+# ===============================================================
+# 🧹 SECTION: AUTOMATIC CLEANING TOOLS
+# ===============================================================
+
+st.header("🧹 Automatic Data Cleaning")
+
+clean_choice = st.multiselect(
+    "Choose cleaning steps to apply:",
+    [
+        "Drop rows with missing values",
+        "Drop columns with >30% missing",
+        "Fill numeric missing values (mean)",
+        "Fill numeric missing values (median)",
+        "Fill numeric missing values (zero)",
+        "Fill categorical missing values (mode)",
+        "Fill categorical missing values ('Unknown')",
+        "Remove duplicate rows",
+        "Remove duplicate columns",
+        "Convert numeric-looking text → numeric",
+        "Convert date-looking text → datetime",
+    ]
+)
+
+df_cleaned = df.copy()
+
+# 1. Drop rows with missing values
+if "Drop rows with missing values" in clean_choice:
+    df_cleaned = df_cleaned.dropna()
+
+# 2. Drop columns with too many missing values
+if "Drop columns with >30% missing" in clean_choice:
+    threshold = 0.3 * len(df_cleaned)
+    df_cleaned = df_cleaned.dropna(axis=1, thresh=threshold)
+
+# 3. Fill numeric missing values
+num_cols = df_cleaned.select_dtypes(include=['int64','float64']).columns
+
+if "Fill numeric missing values (mean)" in clean_choice:
+    df_cleaned[num_cols] = df_cleaned[num_cols].fillna(df_cleaned[num_cols].mean())
+
+if "Fill numeric missing values (median)" in clean_choice:
+    df_cleaned[num_cols] = df_cleaned[num_cols].fillna(df_cleaned[num_cols].median())
+
+if "Fill numeric missing values (zero)" in clean_choice:
+    df_cleaned[num_cols] = df_cleaned[num_cols].fillna(0)
+
+# 4. Fill categorical missing values
+cat_cols = df_cleaned.select_dtypes(include=['object']).columns
+
+if "Fill categorical missing values (mode)" in clean_choice:
+    for col in cat_cols:
+        df_cleaned[col] = df_cleaned[col].fillna(df_cleaned[col].mode()[0])
+
+if "Fill categorical missing values ('Unknown')" in clean_choice:
+    df_cleaned[cat_cols] = df_cleaned[cat_cols].fillna("Unknown")
+
+# 5. Remove duplicate rows
+if "Remove duplicate rows" in clean_choice:
+    df_cleaned = df_cleaned.drop_duplicates()
+
+# 6. Remove duplicate columns
+if "Remove duplicate columns" in clean_choice:
+    df_cleaned = df_cleaned.loc[:, ~df_cleaned.T.duplicated()]
+
+# 7. Convert numeric-like text to numeric
+if "Convert numeric-looking text → numeric" in clean_choice:
+    for col in df_cleaned.columns:
+        df_cleaned[col] = pd.to_numeric(df_cleaned[col], errors="ignore")
+
+# 8. Convert to datetime
+if "Convert date-looking text → datetime" in clean_choice:
+    for col in df_cleaned.columns:
+        try:
+            df_cleaned[col] = pd.to_datetime(df_cleaned[col], errors="ignore")
+        except:
+            pass
+
+st.success("Cleaning applied successfully!")
+st.dataframe(df_cleaned)
+
+# ===============================================================
+# 🧪 SECTION: FEATURE ENGINEERING TOOLS
+# ===============================================================
+
+st.header("🧪 Feature Engineering Tools")
+
+feat_choice = st.multiselect(
+    "Select features to generate:",
+    [
+        "Extract datetime features",
+        "Compute rolling mean (3-period)",
+        "Compute rolling mean (7-period)",
+        "Compute rate of change (%)",
+        "Normalize numeric columns (0–1)",
+        "Standardize (z-score)",
+    ]
+)
+
+df_feat = df_cleaned.copy()
+
+# 1. Extract datetime features
+if "Extract datetime features" in feat_choice:
+    date_cols = df_feat.select_dtypes(include=["datetime64"]).columns
+    for col in date_cols:
+        df_feat[col + "_year"] = df_feat[col].dt.year
+        df_feat[col + "_month"] = df_feat[col].dt.month
+        df_feat[col + "_day"] = df_feat[col].dt.day
+        df_feat[col + "_weekday"] = df_feat[col].dt.day_name()
+
+# 2. Rolling means
+if "Compute rolling mean (3-period)" in feat_choice:
+    for col in num_cols:
+        df_feat[col + "_roll3"] = df_feat[col].rolling(3).mean()
+
+if "Compute rolling mean (7-period)" in feat_choice:
+    for col in num_cols:
+        df_feat[col + "_roll7"] = df_feat[col].rolling(7).mean()
+
+# 3. Rate of change
+if "Compute rate of change (%)" in feat_choice:
+    for col in num_cols:
+        df_feat[col + "_pct_change"] = df_feat[col].pct_change() * 100
+
+# 4. Normalization
+if "Normalize numeric columns (0–1)" in feat_choice:
+    for col in num_cols:
+        df_feat[col + "_norm"] = (df_feat[col] - df_feat[col].min()) / (df_feat[col].max() - df_feat[col].min())
+
+# 5. Z-score standardization
+if "Standardize (z-score)" in feat_choice:
+    for col in num_cols:
+        df_feat[col + "_zscore"] = (df_feat[col] - df_feat[col].mean()) / df_feat[col].std()
+
+st.success("Feature engineering applied!")
+st.dataframe(df_feat)
+
 
 # ====================================================================
 # TAB 1 — OVERVIEW & CLEANING
