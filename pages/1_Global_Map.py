@@ -78,7 +78,19 @@ if view_mode == "Before Processing":
 
     fig.update_geos(showframe=False, projection_type="natural earth")
     st.plotly_chart(fig, use_container_width=True)
+    
+    # Insight Section
+    mean_val = raw_agg[selected_raw].mean()
+    max_country = raw_agg.loc[raw_agg[selected_raw].idxmax(), "Country"]
+    max_val = raw_agg[selected_raw].max()
 
+    st.markdown(f"""
+    ### 📘 Insight  
+    - The average **{selected_raw}** level across all countries is `{mean_val:.2f}`.  
+    - The highest recorded value is in **{max_country}**, with a value of `{max_val:.2f}`.  
+    - Countries with darker shades indicate higher pollutant concentration and greater potential health risks.  
+    """)
+   
     st.stop()
 
 
