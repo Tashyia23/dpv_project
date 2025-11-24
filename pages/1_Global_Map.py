@@ -179,5 +179,13 @@ if view_mode == "Compare Before vs After":
     st.write("### After Processing")
     st.dataframe(summary_after)
 
+    # Comparison Insight
+    st.markdown("""
+    ### 📘 Interpretation  
+    - The *Before Processing* dataset may contain inconsistencies, missing values, or unscaled pollutant readings.  
+    - The *After Processing* dataset reflects cleaned, standardised, and merged information for improved accuracy.  
+    - Differences in column structure highlight transformations such as renaming, normalisation, and risk-index preparation.  
+    """)
+
     
 
