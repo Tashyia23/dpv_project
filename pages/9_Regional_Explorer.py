@@ -20,7 +20,7 @@ load_css()
 st.set_page_config(layout="wide")
 
 # -----------------------------------------------------------------------------
-# Mini gradient + animated bar component (same style family as 7/8)
+# Mini gradient + animated bar component (same style family as other pages)
 # -----------------------------------------------------------------------------
 def mini_bar_chart(values, labels, max_width=220, height=10):
     """Return HTML for a vertical stack of animated gradient bars."""
@@ -105,7 +105,7 @@ raw_pollutant_info = {
 }
 
 available_raw = [c for c in raw_pollutant_info.keys() if c in raw_g.columns]
-# Keep only numeric columns to avoid agg errors
+# Keep only numeric columns to avoid aggregation errors
 raw_numeric = [c for c in available_raw if np.issubdtype(raw_g[c].dtype, np.number)]
 
 if not raw_numeric:
@@ -171,7 +171,6 @@ if view_mode.startswith("Before"):
     # -------------------------------------------------------------------------
     # TAB 1 — OVERVIEW (bar chart + summary)
     # -------------------------------------------------------------------------
-
     with tab_overview:
         selected_region = st.selectbox("Select region", regions, key="raw_region_overview")
         region_subset = raw_country[raw_country["region"] == selected_region].copy()
@@ -181,6 +180,7 @@ if view_mode.startswith("Before"):
         else:
             left, right = st.columns([1.25, 1])
 
+            # --- Main bar chart: Country ranking by avg pollution ---
             with left:
                 st.markdown(f"### {selected_region} – Overview (Raw AQI)")
                 fig_region = px.bar(
@@ -201,12 +201,15 @@ if view_mode.startswith("Before"):
                 st.plotly_chart(fig_region, use_container_width=True)
 
                 with st.expander("📘 Insight — Regional Country Ranking (Raw AQI)"):
-                    st.markdown(f"""
+                    st.markdown(
+                        f"""
 - Countries with **taller bars** have **higher average raw pollution** across all tracked pollutants.  
 - A steep drop between bars suggests **large inequality in air quality** within **{selected_region}**.  
-- Use this chart to quickly spot **regional pollution hotspots** that may need priority intervention.  
-                    """)
+- This view helps quickly identify **regional pollution hotspots** that may need priority intervention.  
+                        """
+                    )
 
+            # --- Right side: metrics + pollutant mix chart ---
             with right:
                 st.markdown("### Region Summary (Raw)")
                 region_mean = region_subset["avg_pollution"].mean()
@@ -214,8 +217,14 @@ if view_mode.startswith("Before"):
                 worst_row = region_subset.loc[region_subset["avg_pollution"].idxmax()]
 
                 st.metric("Region mean raw AQI", f"{region_mean:.1f}")
-                st.metric("Lowest pollution country", f"{best_row['Country']} ({best_row['avg_pollution']:.1f})")
-                st.metric("Highest pollution country", f"{worst_row['Country']} ({worst_row['avg_pollution']:.1f})")
+                st.metric(
+                    "Lowest pollution country",
+                    f"{best_row['Country']} ({best_row['avg_pollution']:.1f})",
+                )
+                st.metric(
+                    "Highest pollution country",
+                    f"{worst_row['Country']} ({worst_row['avg_pollution']:.1f})",
+                )
 
                 st.markdown("#### Average pollutant levels (region-wide, raw)")
                 pollutant_means = region_subset[raw_numeric].mean().reset_index()
@@ -239,17 +248,17 @@ if view_mode.startswith("Before"):
                 st.plotly_chart(fig_poll, use_container_width=True)
 
                 with st.expander("📘 Insight — Pollutant Mix (Raw AQI)"):
-                    st.markdown("""
+                    st.markdown(
+                        """
 - Taller bars highlight pollutants that **dominate regional air quality**.  
-- If one pollutant is much higher than others, it may indicate a **specific emission source** (e.g. traffic, industry, dust).  
-- A more balanced profile suggests a **multi-pollutant burden** affecting the region.  
-                    """)
-
+- A single very tall bar suggests a **specific emission source** (e.g. traffic, industrial, dust).  
+- A more balanced profile suggests a **multi-pollutant burden**, where many pollutants contribute to health risk.  
+                        """
+                    )
 
     # -------------------------------------------------------------------------
     # TAB 2 — RADAR VIEW (Raw)
     # -------------------------------------------------------------------------
-
     with tab_radar:
         st.markdown("### Radar View – Region-Level Raw AQI Profile")
 
@@ -286,17 +295,17 @@ if view_mode.startswith("Before"):
             st.plotly_chart(fig_radar_raw, use_container_width=True)
 
             with st.expander("📘 Insight — Radar Profile (Raw AQI)"):
-                st.markdown(f"""
+                st.markdown(
+                    f"""
 - The shape of the radar plot shows **{selected_region_radar}'s pollution signature**.  
 - Long spikes on a few axes indicate **one or two dominant pollutants** driving poor air quality.  
-- A wide, rounded shape means **elevated levels across many pollutants**, signalling a **broad air-quality issue** rather than a single source.  
-                """)
-
+- A wide, rounded shape means **elevated levels across many pollutants**, suggesting a **broad air-quality problem** rather than a single source.  
+                    """
+                )
 
     # -------------------------------------------------------------------------
     # TAB 3 — HEATMAP (Raw)
     # -------------------------------------------------------------------------
-
     with tab_heatmap:
         st.markdown("### Heatmap – Country vs Pollutant (Raw AQI)")
 
@@ -325,12 +334,13 @@ if view_mode.startswith("Before"):
             st.plotly_chart(fig_heat_raw, use_container_width=True)
 
             with st.expander("📘 Insight — Regional Heatmap (Raw AQI)"):
-                st.markdown(f"""
+                st.markdown(
+                    f"""
 - Darker cells show **higher raw AQI** for a specific pollutant–country pair.  
 - Countries with many dark cells are **multi-pollutant hotspots** within **{selected_region_heat}**.  
 - Columns that are mostly dark indicate pollutants that are **problematic across most countries in the region**.  
-                """)
-
+                    """
+                )
 
     # -------------------------------------------------------------------------
     # TAB 4 — REGION COMPARISON (Side-by-Side, Raw)
@@ -360,9 +370,9 @@ if view_mode.startswith("Before"):
                 avg_a = region_group.loc[region_a, "avg_pollution"]
                 avg_b = region_group.loc[region_b, "avg_pollution"]
 
-                left, right = st.columns(2)
+                left_col, right_col = st.columns(2)
 
-                with left:
+                with left_col:
                     st.markdown(
                         f"""
                         <div style="padding:18px;border-radius:12px;border:1px solid #E5E7EB;background:white;">
@@ -376,7 +386,7 @@ if view_mode.startswith("Before"):
                     st.markdown("#### Pollutant Breakdown (Raw)")
                     st.markdown(mini_bar_chart(a_vals, labels), unsafe_allow_html=True)
 
-                with right:
+                with right_col:
                     st.markdown(
                         f"""
                         <div style="padding:18px;border-radius:12px;border:1px solid #E5E7EB;background:white;">
@@ -395,8 +405,8 @@ if view_mode.startswith("Before"):
                 gap = abs(avg_a - avg_b)
                 st.markdown(
                     f"""
-                    - **Higher overall raw pollution:** `{higher}`  
-                    - **Gap in mean raw AQI:** `{gap:.1f}` units  
+- **Higher overall raw pollution:** `{higher}`  
+- **Gap in mean raw AQI:** `{gap:.1f}` units (larger gaps = bigger disparity in regional exposure).  
                     """
                 )
 
@@ -407,7 +417,6 @@ if view_mode.startswith("Before"):
     )
 
     st.stop()
-
 
 # =============================================================================
 # MODE 2 — AFTER PROCESSING (NORMALISED RISK INDEX)
@@ -433,7 +442,7 @@ scaled_df = pd.DataFrame(scaled)
 proc_country["risk_index"] = scaled_df.mean(axis=1)
 proc_country["risk_percentile"] = proc_country["risk_index"].rank(pct=True)
 
-# Risk levels by quartile
+# Risk levels by quartile (optional label, not plotted directly but useful)
 q1, q2, q3 = np.percentile(proc_country["risk_index"], [25, 50, 75])
 
 def classify_risk(x):
@@ -456,7 +465,6 @@ tab_overview_p, tab_compare_p, tab_heatmap_p = st.tabs(
 # -------------------------------------------------------------------------
 # TAB A — OVERVIEW (Processed)
 # -------------------------------------------------------------------------
-
 with tab_overview_p:
     selected_region_p = st.selectbox(
         "Select region",
@@ -468,9 +476,10 @@ with tab_overview_p:
     if region_proc.empty:
         st.warning("No data for this region in processed dataset.")
     else:
-        left, right = st.columns([1.25, 1])
+        left_p, right_p = st.columns([1.25, 1])
 
-        with left:
+        # --- Left: bar chart of risk index by country ---
+        with left_p:
             st.markdown(f"### {selected_region_p} – Country Risk (0–1 Index)")
             fig_proc_region = px.bar(
                 region_proc.sort_values("risk_index", ascending=False),
@@ -489,21 +498,30 @@ with tab_overview_p:
             st.plotly_chart(fig_proc_region, use_container_width=True)
 
             with st.expander("📘 Insight — Regional Risk Ranking (Processed)"):
-                st.markdown(f"""
-- Countries with higher bars have a **higher composite risk index**, meaning **worse air quality relative to others** in this dataset.  
-- A big gap between the top and bottom bars suggests **unequal environmental health risk** inside **{selected_region_p}**.  
-- This chart summarises multiple pollutants into **one comparable risk score per country**.  
-                """)
+                st.markdown(
+                    f"""
+- Taller bars represent **higher composite risk index**, meaning **worse overall air quality** in **{selected_region_p}**.  
+- A big gap between the top and bottom bars indicates **unequal environmental health risk** inside the region.  
+- Because this is a **normalised index**, it is suitable for **comparing countries fairly**, even when pollutants differ in scale.  
+                    """
+                )
 
-        with right:
+        # --- Right: metrics + processed pollutant mix ---
+        with right_p:
             st.markdown("### Region Risk Summary")
             region_mean = region_proc["risk_index"].mean()
             best_row = region_proc.loc[region_proc["risk_index"].idxmin()]
             worst_row = region_proc.loc[region_proc["risk_index"].idxmax()]
 
             st.metric("Mean risk index", f"{region_mean:.2f}")
-            st.metric("Lowest-risk country", f"{best_row['country']} ({best_row['risk_index']:.2f})")
-            st.metric("Highest-risk country", f"{worst_row['country']} ({worst_row['risk_index']:.2f})")
+            st.metric(
+                "Lowest-risk country",
+                f"{best_row['country']} ({best_row['risk_index']:.2f})",
+            )
+            st.metric(
+                "Highest-risk country",
+                f"{worst_row['country']} ({worst_row['risk_index']:.2f})",
+            )
 
             st.markdown("#### Average pollutant levels (processed, not normalised)")
             pollutant_means_p = region_proc[proc_numeric].mean().reset_index()
@@ -527,17 +545,17 @@ with tab_overview_p:
             st.plotly_chart(fig_poll_p, use_container_width=True)
 
             with st.expander("📘 Insight — Pollutant Mix (Processed)"):
-                st.markdown("""
-- Shows which pollutants are **driving the risk index** in this region after processing and cleaning.  
+                st.markdown(
+                    """
+- Highlights which pollutants are **driving the risk index** in this region after cleaning and standardisation.  
 - A single dominant bar suggests **one main pollutant** (e.g. PM₂.₅) is the key concern.  
-- A flatter profile indicates a **multi-pollutant burden** that may require more holistic policy responses.  
-                """)
-
+- A flatter profile indicates a **multi-pollutant burden**, suggesting that **several pollutants must be managed together**.  
+                    """
+                )
 
 # -------------------------------------------------------------------------
 # TAB B — REGION COMPARISON (Side-by-Side, Processed)
 # -------------------------------------------------------------------------
-
 with tab_compare_p:
     st.markdown("### Side-by-Side Region Comparison (Normalised Risk Index)")
 
@@ -563,9 +581,9 @@ with tab_compare_p:
             avg_a_p = region_group_p.loc[region_a_p, "risk_index"]
             avg_b_p = region_group_p.loc[region_b_p, "risk_index"]
 
-            left_p, right_p = st.columns(2)
+            left_p_col, right_p_col = st.columns(2)
 
-            with left_p:
+            with left_p_col:
                 st.markdown(
                     f"""
                     <div style="padding:18px;border-radius:12px;border:1px solid #E5E7EB;background:white;">
@@ -579,7 +597,7 @@ with tab_compare_p:
                 st.markdown("#### Pollutant Breakdown (Processed)")
                 st.markdown(mini_bar_chart(a_vals_p, labels_p), unsafe_allow_html=True)
 
-            with right_p:
+            with right_p_col:
                 st.markdown(
                     f"""
                     <div style="padding:18px;border-radius:12px;border:1px solid #E5E7EB;background:white;">
@@ -598,12 +616,11 @@ with tab_compare_p:
             gap_p = abs(avg_a_p - avg_b_p)
             st.markdown(
                 f"""
-                - **Higher overall risk index:** `{higher_p}`  
-                - **Risk index gap:** `{gap_p:.2f}` (0 = identical, 1 = max possible gap in this dataset)  
+- **Higher overall risk index:** `{higher_p}`  
+- **Risk index gap:** `{gap_p:.2f}` (0 = identical average risk, 1 = maximum possible spread in this dataset).  
+- Use this view to identify **which region faces more intense composite air-quality risk**, and how **their pollutant profiles differ**.  
                 """
             )
-
-
 
 # -------------------------------------------------------------------------
 # TAB C — HEATMAP (Processed)
@@ -636,47 +653,12 @@ with tab_heatmap_p:
         st.plotly_chart(fig_heat_p, use_container_width=True)
 
         with st.expander("📘 Insight — Processed Regional Heatmap"):
-            st.markdown(f"""
+            st.markdown(
+                f"""
 - Darker cells show **higher processed AQI values**, after cleaning and standardisation.  
 - Countries with many dark cells are **high-risk across several pollutants** within **{selected_region_heat_p}**.  
-- Pollutants forming consistently dark columns are **region-wide challenges** that may need **coordinated policy action**.  
-            """)
-
-
-# -------------------------------------------------------------------------
-# TAB C — HEATMAP (Processed)
-# -------------------------------------------------------------------------
-
-# -------------------------------------------------------------------------
-# TAB C — HEATMAP (Processed)
-# -------------------------------------------------------------------------
-with tab_heatmap_p:
-    st.markdown("### Heatmap – Country vs Pollutant (Processed Dataset)")
-
-    selected_region_heat_p = st.selectbox(
-        "Select region for heatmap",
-        regions_proc,
-        key="proc_region_heatmap",
-    )
-    region_proc_heat = proc_country[proc_country["region"] == selected_region_heat_p]
-
-    if region_proc_heat.empty:
-        st.info("No data available for this region in processed dataset.")
-    else:
-        heat_df_p = region_proc_heat.set_index("country")[proc_numeric]
-        fig_heat_p = px.imshow(
-            heat_df_p,
-            labels=dict(x="Pollutant", y="Country", color="AQI (processed)"),
-            aspect="auto",
-            color_continuous_scale="Reds",
-        )
-        fig_heat_p.update_layout(
-            height=500,
-            margin=dict(l=0, r=0, t=40, b=0),
-            title=f"Processed AQI Heatmap – {selected_region_heat_p}",
-        )
-        st.plotly_chart(fig_heat_p, use_container_width=True)
-
-
+- Pollutants forming consistently dark columns are **region-wide challenges** that may require **coordinated policy action**.  
+                """
+            )
 
 
