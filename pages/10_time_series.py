@@ -132,9 +132,19 @@ else:
 # -------------------------------------------------------------------
 # 3. Tabs for different exploration modes
 # -------------------------------------------------------------------
-tab_global, tab_country, tab_compare = st.tabs(
-    ["🌍 Global Trend", "🇺🇳 Single Country", "🌐 Compare Countries"]
+# tab_global, tab_country, tab_compare = st.tabs(
+#     ["🌍 Global Trend", "🇺🇳 Single Country", "🌐 Compare Countries"]
+# )
+
+tab_global, tab_country, tab_compare, tab_city = st.tabs(
+    [
+        "🌍 Global Trend",
+        "🇺🇳 Single Country",
+        "🌐 Compare Countries",
+        "🏙 Snapshot AQI by City"
+    ]
 )
+
 
 
 # -------------------------------------------------------------------
@@ -397,3 +407,120 @@ with tab_compare:
         st.markdown("### 📊 Comparison Table")
         st.dataframe(summary, use_container_width=True)
 
+#___________
+
+# -------------------------------------------------------------------
+# TAB 4 — SNAPSHOT AQI BY CITY (Processed AQI)
+# -------------------------------------------------------------------
+with tab_city:
+    st.markdown("## 🏙 Snapshot AQI by City")
+
+    # Load processed AQI dataset directly from uploaded file
+    try:
+        aqi_df = pd.read_csv("/mnt/data/global_air_pollution.csv")
+    except:
+        st.error("Processed AQI dataset not found.")
+        st.stop()
+
+    # Clean column names
+    aqi_df.columns = [c.strip() for c in aqi_df.columns]
+
+    required_cols = ["Country", "City"]
+    if not all(col in aqi_df.columns for col in required_cols):
+        st.error("Processed AQI dataset missing Country/City columns.")
+        st.stop()
+
+    # Select country
+    countries = sorted(aqi_df["Country"].dropna().unique())
+    selected_country = st.selectbox("Select Country:", countries, key="city_country")
+
+    # Select city
+    city_list = sorted(
+        aqi_df[aqi_df["Country"] == selected_country]["City"].dropna().unique()
+    )
+    selected_city = st.selectbox("Select City:", city_list, key="city_name")
+
+    # Filter row
+    row = aqi_df[
+        (aqi_df["Country"] == selected_country) &
+        (aqi_df["City"] == selected_city)
+    ].head(1)
+
+    if row.empty:
+        st.warning("No AQI data available for this city.")
+        st.stop()
+
+    pollutant_cols = [
+        "PM2.5 AQI Value", "PM10 AQI Value", "NO2 AQI Value",
+        "Ozone AQI Value", "CO AQI Value"
+    ]
+    available = [c for c in pollutant_cols if c in aqi_df.columns]
+
+    pollutant_values = row[available].iloc[0].astype(float)
+
+    st.markdown(f"### 🌬 AQI Snapshot: **{selected_city}**, {selected_country}")
+
+    # ---------------------------
+    # BAR CHART
+    # ---------------------------
+    bar_df = pd.DataFrame({
+        "Pollutant": available,
+        "AQI": pollutant_values.values
+    })
+
+    fig_bar = px.bar(
+        bar_df,
+        x="Pollutant",
+        y="AQI",
+        color="AQI",
+        color_continuous_scale="Reds",
+        title=f"AQI Levels in {selected_city}",
+    )
+    fig_bar.update_layout(height=350)
+    st.plotly_chart(fig_bar, use_container_width=True)
+
+    # ---------------------------
+    # RADAR CHART
+    # ---------------------------
+    fig_radar = go.Figure()
+    fig_radar.add_trace(go.Scatterpolar(
+        r=pollutant_values.values,
+        theta=available,
+        fill="toself",
+        line=dict(color="#F43F5E"),
+        name="AQI Levels"
+    ))
+    fig_radar.update_layout(
+        title="Pollution Profile (Radar Chart)",
+        polar=dict(radialaxis=dict(visible=True)),
+        height=450
+    )
+    st.plotly_chart(fig_radar, use_container_width=True)
+
+    # ---------------------------
+    # CATEGORY BADGES
+    # ---------------------------
+    st.markdown("### 📛 AQI Category Summary")
+
+    category_cols = [c.replace("Value", "Category") for c in available]
+
+    for val_col, cat_col in zip(available, category_cols):
+        if cat_col in row.columns:
+            cat = row[cat_col].iloc[0]
+            val = float(row[val_col].iloc[0])
+            st.markdown(
+                f"""
+                <div style='padding:10px;margin:8px 0;border-radius:8px;
+                background:#f3f4f6;border:1px solid #e5e7eb;'>
+                    <b>{val_col.replace(" AQI Value","")}</b>:  
+                    <span style='color:#dc2626;font-weight:700;'>{val}</span>  
+                    — <i>{cat}</i>
+                </div>
+                """,
+                unsafe_allow_html=True
+            )
+
+    st.info(
+        "This section shows **current AQI levels** for each pollutant, not a time series. "
+        "Use the tabs above to explore PM₂.₅ trends over time."
+    )
