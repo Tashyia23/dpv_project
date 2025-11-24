@@ -13,13 +13,24 @@ def load_css():
     with open("styles/custom.css") as f:
         st.markdown(f"<style>{f.read()}</style>", unsafe_allow_html=True)
         
-# header
-header(
-    "🌍 Global Air Pollution Analytics Suite",
-   "Analyse global AQI levels, pollutant distributions, regional trends, WHO PM₂.₅ 
+# ---------------------------------------------------------
+# Hero Section
+# ---------------------------------------------------------
+st.markdown("""
+<div style="padding: 10px 0 30px 0;">
+    <h1 style="font-size: 2.7rem; font-weight: 700; color: #1f2937;">
+        🌍 Global Air Pollution Analytics Suite
+    </h1>
+    <p style="font-size:1.15rem; color:#4b5563; max-width: 820px;">
+        Analyse global AQI levels, pollutant distributions, regional trends, WHO PM₂.₅ 
         time-series, and multi-country comparisons using scientific visualisation and 
-        data-processing techniques."
-)
+        data-processing techniques.
+    </p>
+</div>
+""", unsafe_allow_html=True)
+
+st.markdown("---")
+
 
 # ---------------------------------------------------------
 # Dashboard Overview
