@@ -171,9 +171,7 @@ if view_mode.startswith("Before"):
     # -------------------------------------------------------------------------
     # TAB 1 — OVERVIEW (bar chart + summary)
     # -------------------------------------------------------------------------
-    # -------------------------------------------------------------------------
-    # TAB 1 — OVERVIEW (bar chart + summary)
-    # -------------------------------------------------------------------------
+
     with tab_overview:
         selected_region = st.selectbox("Select region", regions, key="raw_region_overview")
         region_subset = raw_country[raw_country["region"] == selected_region].copy()
@@ -251,9 +249,7 @@ if view_mode.startswith("Before"):
     # -------------------------------------------------------------------------
     # TAB 2 — RADAR VIEW (Raw)
     # -------------------------------------------------------------------------
-        # -------------------------------------------------------------------------
-    # TAB 2 — RADAR VIEW (Raw)
-    # -------------------------------------------------------------------------
+
     with tab_radar:
         st.markdown("### Radar View – Region-Level Raw AQI Profile")
 
@@ -300,9 +296,7 @@ if view_mode.startswith("Before"):
     # -------------------------------------------------------------------------
     # TAB 3 — HEATMAP (Raw)
     # -------------------------------------------------------------------------
-        # -------------------------------------------------------------------------
-    # TAB 3 — HEATMAP (Raw)
-    # -------------------------------------------------------------------------
+
     with tab_heatmap:
         st.markdown("### Heatmap – Country vs Pollutant (Raw AQI)")
 
@@ -462,9 +456,7 @@ tab_overview_p, tab_compare_p, tab_heatmap_p = st.tabs(
 # -------------------------------------------------------------------------
 # TAB A — OVERVIEW (Processed)
 # -------------------------------------------------------------------------
-# -------------------------------------------------------------------------
-# TAB A — OVERVIEW (Processed)
-# -------------------------------------------------------------------------
+
 with tab_overview_p:
     selected_region_p = st.selectbox(
         "Select region",
@@ -545,6 +537,74 @@ with tab_overview_p:
 # -------------------------------------------------------------------------
 # TAB B — REGION COMPARISON (Side-by-Side, Processed)
 # -------------------------------------------------------------------------
+
+with tab_compare_p:
+    st.markdown("### Side-by-Side Region Comparison (Normalised Risk Index)")
+
+    colA_p, colB_p = st.columns(2)
+    with colA_p:
+        region_a_p = st.selectbox("Select Region A", regions_proc, key="proc_region_a")
+    with colB_p:
+        region_b_p = st.selectbox("Select Region B", regions_proc, key="proc_region_b")
+
+    if region_a_p == region_b_p:
+        st.warning("⚠ Please select two different regions for comparison.")
+    else:
+        # Region-level mean over countries
+        region_group_p = proc_country.groupby("region")[proc_numeric + ["risk_index"]].mean()
+
+        if region_a_p not in region_group_p.index or region_b_p not in region_group_p.index:
+            st.error("One of the selected regions has no data in processed dataset.")
+        else:
+            a_vals_p = region_group_p.loc[region_a_p, proc_numeric].tolist()
+            b_vals_p = region_group_p.loc[region_b_p, proc_numeric].tolist()
+            labels_p = [pretty_proc_labels[c] for c in proc_numeric]
+
+            avg_a_p = region_group_p.loc[region_a_p, "risk_index"]
+            avg_b_p = region_group_p.loc[region_b_p, "risk_index"]
+
+            left_p, right_p = st.columns(2)
+
+            with left_p:
+                st.markdown(
+                    f"""
+                    <div style="padding:18px;border-radius:12px;border:1px solid #E5E7EB;background:white;">
+                        <div style="font-size:1.1rem;font-weight:600;color:#1F2937;">{region_a_p}</div>
+                        <div style="font-size:1.8rem;font-weight:700;color:#4F46E5;">{avg_a_p:.2f}</div>
+                        <div style="font-size:0.9rem;color:#6B7280;">Mean composite risk index (0–1)</div>
+                    </div>
+                    """,
+                    unsafe_allow_html=True,
+                )
+                st.markdown("#### Pollutant Breakdown (Processed)")
+                st.markdown(mini_bar_chart(a_vals_p, labels_p), unsafe_allow_html=True)
+
+            with right_p:
+                st.markdown(
+                    f"""
+                    <div style="padding:18px;border-radius:12px;border:1px solid #E5E7EB;background:white;">
+                        <div style="font-size:1.1rem;font-weight:600;color:#1F2937;">{region_b_p}</div>
+                        <div style="font-size:1.8rem;font-weight:700;color:#4F46E5;">{avg_b_p:.2f}</div>
+                        <div style="font-size:0.9rem;color:#6B7280;">Mean composite risk index (0–1)</div>
+                    </div>
+                    """,
+                    unsafe_allow_html=True,
+                )
+                st.markdown("#### Pollutant Breakdown (Processed)")
+                st.markdown(mini_bar_chart(b_vals_p, labels_p), unsafe_allow_html=True)
+
+            st.markdown("### 🔍 Interpretation")
+            higher_p = region_a_p if avg_a_p > avg_b_p else region_b_p
+            gap_p = abs(avg_a_p - avg_b_p)
+            st.markdown(
+                f"""
+                - **Higher overall risk index:** `{higher_p}`  
+                - **Risk index gap:** `{gap_p:.2f}` (0 = identical, 1 = max possible gap in this dataset)  
+                """
+            )
+
+
+
 # -------------------------------------------------------------------------
 # TAB C — HEATMAP (Processed)
 # -------------------------------------------------------------------------
