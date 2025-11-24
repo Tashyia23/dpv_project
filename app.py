@@ -16,37 +16,10 @@ def load_css():
 # header
 header(
     "🌍 Global Air Pollution Analytics Suite",
-    "Analyse global AQI levels, pollutant distributions, and long-term PM2.5 trends using scientific visualisation techniques."
-)
-
-# # welcome display
-# st.write("### Welcome to the Global Air Pollution Dashboard!")
-# st.write("""
-# This dashboard provides:
-# - Global AQI mapping  
-# - Pollutant profiles  
-# - Multi-country comparison  
-# - PM2.5 historical trends  
-# - Dynamic data processing & analysis  
-# """)
-
-# ---------------------------------------------------------
-# Hero Section
-# ---------------------------------------------------------
-st.markdown("""
-<div style="padding: 10px 0 30px 0;">
-    <h1 style="font-size: 2.7rem; font-weight: 700; color: #1f2937;">
-        🌍 Global Air Pollution Analytics Suite
-    </h1>
-    <p style="font-size:1.15rem; color:#4b5563; max-width: 820px;">
-        Analyse global AQI levels, pollutant distributions, regional trends, WHO PM₂.₅ 
+    "Analyse global AQI levels, pollutant distributions, regional trends, WHO PM₂.₅ 
         time-series, and multi-country comparisons using scientific visualisation and 
-        data-processing techniques.
-    </p>
-</div>
-""", unsafe_allow_html=True)
-
-st.markdown("---")
+        data-processing techniques."
+)
 
 # ---------------------------------------------------------
 # Dashboard Overview
@@ -106,6 +79,6 @@ st.markdown("---")
 # ---------------------------------------------------------
 st.markdown("""
 <div style="text-align:center; padding: 20px 0; color: #6b7280;">
-    Built with ❤️ using Streamlit · Global Air Pollution Analytics Suite
+    Built with Streamlit · Global Air Pollution Analytics Suite by Priscilla, Ehang, Qi Yun, Kavieraj, and Juhitashyia
 </div>
 """, unsafe_allow_html=True)
