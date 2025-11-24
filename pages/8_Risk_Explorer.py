@@ -47,7 +47,7 @@ header(
 )
 
 # Identify pollutant columns
-raw_pollutants = [c for c in raw_g.columns if any(x in c.lower() for x in ["aqi", "value"])]
+raw_pollutants = [c for c in raw_g.columns if any(x in c.lower() for x in ["aqi", "value"]) and "category" not in c.lower()]
 proc_pollutants = [c for c in processed_df.columns if c.endswith("_aqi_value")]
 
 # --------------------------------------------------------------------
