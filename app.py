@@ -16,7 +16,7 @@ def load_css():
 # header
 header(
     "🌍 Global Air Pollution Analytics Suite",
-       "Analyse global AQI levels, pollutant distributions, regional trends, WHO PM₂.₅ 
+   "Analyse global AQI levels, pollutant distributions, regional trends, WHO PM₂.₅ 
         time-series, and multi-country comparisons using scientific visualisation and 
         data-processing techniques."
 )
